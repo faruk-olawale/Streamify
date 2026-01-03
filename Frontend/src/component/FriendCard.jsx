@@ -27,6 +27,13 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
           </div>
         </div>
 
+        {/* BIO - ONLY ADDITION */}
+        {friend.bio && (
+          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+            {friend.bio}
+          </p>
+        )}
+
         {/* LANGUAGES */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           <span className="badge badge-secondary text-xs">
