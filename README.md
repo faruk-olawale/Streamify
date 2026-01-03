@@ -329,7 +329,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 👨‍💻 Contact
 
-**Faruk Olawale** - farry@gmail.com
+**Faruk Olawale** - farukolawale509@gmail.com
 
 Project Link: [https://github.com/faruk-olawale/Streamify](https://github.com/faruk-olawale/Streamify)
 
