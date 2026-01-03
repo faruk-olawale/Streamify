@@ -3,6 +3,10 @@ import { LANGUAGE_TO_FLAG } from "../constants";
 import { Link } from "react-router";
 
 const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) => {
+  // Debug: Log the friend object to see what data we're getting
+  console.log("Friend data:", friend);
+  console.log("Has bio:", !!friend.bio);
+  
   return (
     <div className="card bg-base-200 hover:shadow-md transition-shadow">
       <div className="card-body p-4">
@@ -27,6 +31,13 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
           </div>
         </div>
 
+        {/* BIO */}
+        {friend.bio && (
+          <p className="text-sm text-base-content/70 mb-3 line-clamp-2">
+            {friend.bio}
+          </p>
+        )}
+
         {/* LANGUAGES */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           <span className="badge badge-secondary text-xs">
@@ -44,7 +55,7 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
         {isFriend ? (
           <Link 
             to={`/chat/${friend._id}`} 
-            className=" btn btn-outline text-xs"
+            className="btn btn-outline text-xs w-full"
           >
             <MessageCircleIcon className="size-4 mr-2" />
             Message
