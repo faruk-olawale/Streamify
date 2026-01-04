@@ -1,16 +1,19 @@
 import React from 'react'
 import useAuthUser from '../hooks/useAuthUser'
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { logout } from '../lib/api';
 import { Link } from 'react-router';
-import { ShipWheelIcon, BellIcon, LogOutIcon } from 'lucide-react';
+import { ShipWheelIcon, BellIcon, LogOutIcon, ArrowLeft } from 'lucide-react';
 import ThemeSelector from './ThemeSelector';
 
 const Navbar = () => {
   const {authUser} = useAuthUser();
   const location = useLocation();
+  const navigate = useNavigate();
   const isChatPage = location.pathname.startsWith("/chat");
+  const isNotificationsPage = location.pathname === "/notifications";
+  const showBackArrow = isChatPage || isNotificationsPage; // Show on both pages
 
   const queryClient = useQueryClient();
 
@@ -23,7 +26,20 @@ const Navbar = () => {
     <nav className='bg-base-200 border-b border-base-300 sticky top-0 z-30 h-16 flex items-center'>
       <div className='container mx-auto px-4 lg:px-8'>
         <div className='flex items-center justify-end w-full'>
-          {/* LOGO ONLY ONLY IN THE CHAT PAGE */}
+          {/* BACK ARROW - ONLY ON NOTIFICATIONS PAGE (MOBILE & TABLET ONLY) */}
+          {isNotificationsPage && (
+            <div className='mr-auto lg:hidden'>
+              <button 
+                onClick={() => navigate("/")}
+                className='btn btn-ghost btn-circle'
+                aria-label="Back to home"
+              >
+                <ArrowLeft className="h-6 w-6 text-base-content opacity-70"/>
+              </button>
+            </div>
+          )}
+
+          {/* LOGO ONLY IN THE CHAT PAGE */}
           {isChatPage && (
             <div className='pl-5'>
               <Link to="/" className="flex items-center gap-2.5">
@@ -51,7 +67,6 @@ const Navbar = () => {
               <img src={authUser?.profilePic} alt="User Avater" rel='noreferer' />
             </div>
           </div>
-
 
           <div className='btn btn-ghost btn-circle' onClick={logoutMutation}>
             <LogOutIcon className="h-6 w-6 text-base-content opacity-70"/>
