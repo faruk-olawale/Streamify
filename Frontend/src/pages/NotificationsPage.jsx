@@ -8,9 +8,7 @@ import {
   MessagesSquareIcon,
 } from "lucide-react";
 
-/**
- * Format how long ago something happened
- */
+// Format time since a timestamp
 function formatTime(timestamp) {
   if (!timestamp) return "Recently";
 
@@ -24,88 +22,38 @@ function formatTime(timestamp) {
   if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
   if (diffHrs < 24) return `${diffHrs} hour${diffHrs === 1 ? "" : "s"} ago`;
   if (diffHrs < 30) return "1 day ago"; // 24–30 hours
-  return null; // remove after 30 hours
+  return null; // Remove after ~30 hours
 }
 
-export default function NotificationsPage() {
+function NotificationsPage() {
   const queryClient = useQueryClient();
-  const [now, setNow] = useState(Date.now());
-  const [acceptedRequests, setAcceptedRequests] = useState([]);
-
-  // Track which notifications are fading out
-  const [fadingOut, setFadingOut] = useState({});
-
-  // Fetch incoming and accepted friend requests
   const { data: friendRequests, isLoading } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
-    onSuccess: (data) => {
-      const filteredAccepted =
-        (data?.acceptedReqs || []).filter(
-          (n) => formatTime(n.updatedAt || n.createdAt) !== null
-        ) || [];
-      setAcceptedRequests(filteredAccepted);
+  });
+
+  const { mutate: acceptRequestMutation, isPending } = useMutation({
+    mutationFn: acceptFriendRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
+      queryClient.invalidateQueries({ queryKey: ["friends"] });
     },
   });
 
   const incomingRequests = friendRequests?.incomingReqs || [];
+  const acceptedRequests = friendRequests?.acceptedReqs || [];
 
-  // Rerender every minute to update time labels
+  // Re-render every minute for live time updates
+  const [, setNow] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Check every minute for notifications to fade out
-  useEffect(() => {
-    const interval = setInterval(() => {
-      acceptedRequests.forEach((n) => {
-        const timeLabel = formatTime(n.updatedAt || n.createdAt);
-        if (!timeLabel && !fadingOut[n._id]) {
-          // start fade out
-          setFadingOut((prev) => ({ ...prev, [n._id]: true }));
-          // remove after 1s (fade duration)
-          setTimeout(() => {
-            setAcceptedRequests((prev) =>
-              prev.filter((item) => item._id !== n._id)
-            );
-            setFadingOut((prev) => {
-              const newState = { ...prev };
-              delete newState[n._id];
-              return newState;
-            });
-          }, 1000);
-        }
-      });
-    }, 60000); // every minute
-    return () => clearInterval(interval);
-  }, [acceptedRequests, fadingOut]);
-
-  // Accept friend request mutation
-  const { mutate: acceptRequestMutation, isPending } = useMutation({
-    mutationFn: acceptFriendRequest,
-    onSuccess: (data, requestId) => {
-      queryClient.setQueryData(["friendRequests"], (oldData) => {
-        const updatedIncoming = (oldData?.incomingReqs || []).filter(
-          (r) => r._id !== requestId
-        );
-        return { ...oldData, incomingReqs: updatedIncoming };
-      });
-      const acceptedRequest = incomingRequests.find(
-        (r) => r._id === requestId
-      );
-      if (acceptedRequest) {
-        setAcceptedRequests((prev) => [
-          ...prev,
-          { ...acceptedRequest, updatedAt: new Date().toISOString() },
-        ]);
-      }
-    },
-  });
-
-  const displayedAccepted = acceptedRequests.filter(
-    (n) => formatTime(n.updatedAt || n.createdAt) !== null
-  );
+  // Filter accepted requests that are still visible
+  const visibleAccepted = acceptedRequests
+    .map((n) => ({ ...n, timeLabel: formatTime(n.updatedAt || n.createdAt) }))
+    .filter((n) => n.timeLabel !== null);
 
   return (
     <div className="min-h-screen bg-base-100 px-4 sm:px-6 lg:px-8 py-6">
@@ -140,23 +88,21 @@ export default function NotificationsPage() {
                       <div className="card-body p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="avatar w-14 rounded-full bg-base-300">
-                              <img
-                                src={request.sender.profilePic}
-                                alt={request.sender.fullName}
-                              />
+                            <div className="avatar">
+                              <div className="w-14 rounded-full bg-base-300">
+                                <img
+                                  src={request.sender.profilePic}
+                                  alt={request.sender.fullName}
+                                />
+                              </div>
                             </div>
                             <div>
-                              <h3 className="font-semibold">
-                                {request.sender.fullName}
-                              </h3>
+                              <h3 className="font-semibold">{request.sender.fullName}</h3>
                               <div className="flex flex-wrap gap-1.5 mt-1">
                                 {request.sender.nativeLanguages && (
                                   <span className="badge badge-secondary badge-sm">
                                     Native:{" "}
-                                    {Array.isArray(
-                                      request.sender.nativeLanguages
-                                    )
+                                    {Array.isArray(request.sender.nativeLanguages)
                                       ? request.sender.nativeLanguages.join(", ")
                                       : request.sender.nativeLanguages}
                                   </span>
@@ -164,9 +110,7 @@ export default function NotificationsPage() {
                                 {request.sender.learningLanguages && (
                                   <span className="badge badge-outline badge-sm">
                                     Learning:{" "}
-                                    {Array.isArray(
-                                      request.sender.learningLanguages
-                                    )
+                                    {Array.isArray(request.sender.learningLanguages)
                                       ? request.sender.learningLanguages.join(", ")
                                       : request.sender.learningLanguages}
                                   </span>
@@ -191,7 +135,7 @@ export default function NotificationsPage() {
             )}
 
             {/* NEW CONNECTIONS */}
-            {displayedAccepted.length > 0 && (
+            {visibleAccepted.length > 0 && (
               <section className="space-y-4">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <BellIcon className="h-5 w-5 text-success" />
@@ -199,65 +143,55 @@ export default function NotificationsPage() {
                 </h2>
 
                 <div className="space-y-3">
-                  {displayedAccepted.map((notification) => {
-                    const timeLabel = formatTime(
-                      notification.updatedAt || notification.createdAt
-                    );
-                    const isFading = fadingOut[notification._id] || false;
-
-                    return (
-                      <div
-                        key={notification._id}
-                        className={`card bg-base-200 shadow-sm transition-opacity duration-1000 ${
-                          isFading ? "opacity-0" : "opacity-100"
-                        }`}
-                      >
-                        <div className="card-body p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="avatar w-10 h-10 rounded-full">
+                  {visibleAccepted.map((notification) => (
+                    <div
+                      key={notification._id}
+                      className="card bg-base-200 shadow-sm"
+                    >
+                      <div className="card-body p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="avatar">
+                            <div className="w-10 h-10 rounded-full">
                               <img
                                 src={notification.recipient.profilePic}
                                 alt={notification.recipient.fullName}
                               />
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold">
-                                {notification.recipient.fullName}
-                              </h3>
-                              <p className="text-sm my-1">
-                                You are now friends with{" "}
-                                {notification.recipient.fullName}
-                              </p>
-                              <p className="text-xs flex items-center opacity-70">
-                                <ClockIcon className="h-3 w-3 mr-1" />
-                                {timeLabel}
-                              </p>
-                            </div>
-                            <div className="badge badge-success">
-                              <MessagesSquareIcon className="h-3 w-3 mr-1" />
-                              New Friend
-                            </div>
+                          </div>
+
+                          <div className="flex-1">
+                            <h3 className="font-semibold">{notification.recipient.fullName}</h3>
+                            <p className="text-sm my-1">
+                              You are now friends with {notification.recipient.fullName}
+                            </p>
+                            <p className="text-xs flex items-center opacity-70">
+                              <ClockIcon className="h-3 w-3 mr-1" />
+                              {notification.timeLabel}
+                            </p>
+                          </div>
+
+                          <div className="badge badge-success">
+                            <MessagesSquareIcon className="h-3 w-3 mr-1" />
+                            New Friend
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
 
             {/* EMPTY STATE */}
-            {incomingRequests.length === 0 && displayedAccepted.length === 0 && (
+            {incomingRequests.length === 0 && visibleAccepted.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="size-16 rounded-full bg-base-300 flex items-center justify-center mb-4">
                   <BellIcon className="size-8 opacity-40" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">
-                  No notifications yet
-                </h3>
+
+                <h3 className="text-lg font-semibold mb-2">No notifications yet</h3>
                 <p className="opacity-70">
-                  When you receive friend requests or messages, they'll appear
-                  here.
+                  When you receive friend requests or messages, they'll appear here.
                 </p>
               </div>
             )}
@@ -267,3 +201,5 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
+export default NotificationsPage;
