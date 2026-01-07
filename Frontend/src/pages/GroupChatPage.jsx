@@ -61,48 +61,47 @@ const GroupChatPage = ({ authUser }) => {
   const userRole = groupData?.userRole;
 
   // Setup Stream Chat
-async function setupStream() {
-  if (setupInProgress.current || !group) return;
-  setupInProgress.current = true;
+  async function setupStream() {
+    if (setupInProgress.current || !group) return;
+    setupInProgress.current = true;
 
-  try {
-    // Get Stream token
-    const tokenData = await getStreamToken();
-    
-    if (!tokenData || !tokenData.token || !tokenData.user) {
-      throw new Error("Invalid token data received");
+    try {
+      const tokenData = await getStreamToken();
+      
+      if (!tokenData || !tokenData.token || !tokenData.user) {
+        throw new Error("Invalid token data received");
+      }
+
+      const { token, user } = tokenData;
+
+      const streamClient = StreamChat.getInstance(
+        import.meta.env.VITE_STREAM_API_KEY
+      );
+
+      await streamClient.connectUser(
+        {
+          id: user._id,
+          name: user.name || user.fullName,
+          image: user.profilePicture || user.profilePic,
+        },
+        token
+      );
+
+      const groupChannel = streamClient.channel(
+        "messaging",
+        group.streamChannelId
+      );
+      await groupChannel.watch();
+
+      setClient(streamClient);
+      setChannel(groupChannel);
+    } catch (err) {
+      console.error("Stream setup error:", err);
+      toast.error("Could not connect to chat. Please try again.");
+    } finally {
+      setupInProgress.current = false;
     }
-
-    const { token, user } = tokenData;
-
-    const streamClient = StreamChat.getInstance(
-      import.meta.env.VITE_STREAM_API_KEY
-    );
-
-    await streamClient.connectUser(
-      {
-        id: user._id,
-        name: user.name,
-        image: user.profilePicture,
-      },
-      token
-    );
-
-    const groupChannel = streamClient.channel(
-      "messaging",
-      group.streamChannelId
-    );
-    await groupChannel.watch();
-
-    setClient(streamClient);
-    setChannel(groupChannel);
-  } catch (err) {
-    console.error("Stream setup error:", err);
-    toast.error("Could not connect to chat. Please try again.");
-  } finally {
-    setupInProgress.current = false;
   }
-}
 
   useEffect(() => {
     if (group && userRole?.isMember && !client) {
@@ -222,43 +221,38 @@ async function setupStream() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-     <div className="bg-base-200 p-4 flex items-center justify-between border-b border-base-300">
-     <div className="flex items-center gap-3">
-    <button
-      onClick={() => navigate("/groups")}
-      className="btn btn-ghost btn-sm btn-circle"
-    >
-      <ArrowLeft size={20} />
-    </button>
-    <div className="avatar">
-      <div className="w-10 h-10 rounded-lg">
-        <img 
-          src={group.image || 'https://via.placeholder.com/150?text=Group'} 
-          alt={group.name}
-          onError={(e) => {
-            e.target.src = 'https://ui-avatars.com/api/?name=' + group.name + '&background=random'
-          }}
-        />
-      </div>
-    </div>
-    <div>
-      <h2 className="font-bold text-lg">{group.name}</h2>
-      <p className="text-sm text-base-content/60">
-        {group.members?.length || 0} members
-      </p>
-    </div>
-  </div>
+      <div className="bg-base-200 p-4 flex items-center justify-between border-b border-base-300">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate("/groups")}
+            className="btn btn-ghost btn-sm btn-circle"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="avatar">
+            <div className="w-10 h-10 rounded-lg">
+              <img src={group.image} alt={group.name} />
+            </div>
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">{group.name}</h2>
+            <p className="text-sm text-base-content/60">
+              {group.members?.length || 0} members
+            </p>
+          </div>
+        </div>
 
-  {userRole?.isMember && (
-    <button
-      onClick={() => setShowSettings(!showSettings)}
-      className="btn btn-ghost btn-sm gap-2"
-    >
-      <Settings size={20} />
-      {userRole.isAdmin && <Shield size={16} className="text-warning" />}
-    </button>
-  )}
-</div>
+        {userRole?.isMember && (
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="btn btn-ghost btn-sm gap-2"
+          >
+            <Settings size={20} />
+            {userRole.isAdmin && <Shield size={16} className="text-warning" />}
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 flex overflow-hidden">
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
@@ -327,130 +321,124 @@ async function setupStream() {
                   {group.description || "No description"}
                 </p>
                 <div className="mt-2 text-sm text-base-content/60">
-                  <p>Created by: {group.createdBy?.name}</p>
+                  <p>Created by: {group.createdBy?.fullName || group.createdBy?.name}</p>
                   <p>{group.members?.length || 0} members</p>
                 </div>
               </div>
 
               {/* Pending Requests (Admin Only) */}
-      {userRole.isAdmin && group.pendingRequests?.length > 0 && (
-       <div className="mb-6">
-        <h4 className="font-semibold mb-2">
-          Pending Requests ({group.pendingRequests.length})
-        </h4>
-        <div className="space-y-2">
-          {group.pendingRequests.map((request) => (
-            <div
-          key={request.userId._id}
-          className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
-        >
-          <div className="flex items-center gap-2">
-            <div className="avatar">
-              <div className="w-8 h-8 rounded-full">
-                <img
-                  src={request.userId.profilePicture || request.userId.profilePic || 'https://via.placeholder.com/100'}
-                  alt={request.userId.name}
-                  onError={(e) => {
-                    e.target.src = 'https://ui-avatars.com/api/?name=' + (request.userId.name || 'User') + '&background=random'
-                  }}
-                />
-              </div>
-            </div>
-            <span className="text-sm font-medium">
-              {request.userId.name}
-            </span>
-          </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() =>
-                approveRequestMutation.mutate(request.userId._id)
-              }
-              className="btn btn-success btn-xs"
-              title="Approve"
-            >
-              <CheckCircle size={14} />
-            </button>
-            <button
-              onClick={() =>
-                rejectRequestMutation.mutate(request.userId._id)
-              }
-              className="btn btn-error btn-xs"
-              title="Reject"
-            >
-              <XCircle size={14} />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+              {userRole.isAdmin && group.pendingRequests?.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold mb-2">
+                    Pending Requests ({group.pendingRequests.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {group.pendingRequests.map((request) => (
+                      <div
+                        key={request.userId._id}
+                        className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="avatar">
+                            <div className="w-8 h-8 rounded-full">
+                              <img
+                                src={request.userId.profilePic}
+                                alt={request.userId.fullName}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-sm font-medium">
+                            {request.userId.fullName}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() =>
+                              approveRequestMutation.mutate(request.userId._id)
+                            }
+                            className="btn btn-success btn-xs"
+                            title="Approve"
+                          >
+                            <CheckCircle size={14} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              rejectRequestMutation.mutate(request.userId._id)
+                            }
+                            className="btn btn-error btn-xs"
+                            title="Reject"
+                          >
+                            <XCircle size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Members List */}
-     <div className="mb-6">
-      <h4 className="font-semibold mb-2">
-        Members ({group.members?.length || 0})
-      </h4>
-      <div className="space-y-2 max-h-64 overflow-y-auto">
-      {group.members?.map((member) => {
-        const isAdmin = group.admins?.some(
-          (admin) => admin._id === member._id
-        );
-        const isCreator = group.createdBy?._id === member._id;
+              <div className="mb-6">
+                <h4 className="font-semibold mb-2">
+                  Members ({group.members?.length || 0})
+                </h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {group.members?.map((member) => {
+                    const isAdmin = group.admins?.some(
+                      (admin) => admin._id === member._id
+                    );
+                    const isCreator = group.createdBy?._id === member._id;
 
-      return (
-        <div
-          key={member._id}
-          className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
-        >
-          <div className="flex items-center gap-2">
-            <div className="avatar">
-              <div className="w-8 h-8 rounded-full">
-                <img
-                  src={member.profilePicture || member.profilePic || 'https://via.placeholder.com/100'}
-                  alt={member.name}
-                  onError={(e) => {
-                    e.target.src = 'https://ui-avatars.com/api/?name=' + (member.name || 'User') + '&background=random'
-                  }}
-                />
+                    return (
+                      <div
+                        key={member._id}
+                        className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="avatar">
+                            <div className="w-8 h-8 rounded-full">
+                              <img
+                                src={member.profilePic}
+                                alt={member.fullName}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">
+                              {member.fullName}
+                            </span>
+                            {isCreator && (
+                              <Crown
+                                size={14}
+                                className="inline ml-1 text-warning"
+                              />
+                            )}
+                            {isAdmin && !isCreator && (
+                              <Shield
+                                size={14}
+                                className="inline ml-1 text-info"
+                              />
+                            )}
+                          </div>
+                        </div>
+                        {userRole.isAdmin &&
+                          member._id !== authUser._id &&
+                          !isCreator && (
+                            <button
+                              onClick={() =>
+                                removeMemberMutation.mutate(member._id)
+                              }
+                              className="btn btn-error btn-xs"
+                              title="Remove member"
+                            >
+                              <UserMinus size={14} />
+                            </button>
+                          )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-            <div>
-              <span className="text-sm font-medium">
-                {member.name}
-              </span>
-              {isCreator && (
-                <Crown
-                  size={14}
-                  className="inline ml-1 text-warning"
-                />
-              )}
-              {isAdmin && !isCreator && (
-                <Shield
-                  size={14}
-                  className="inline ml-1 text-info"
-                />
-              )}
-            </div>
-          </div>
-          {userRole.isAdmin &&
-            member._id !== authUser._id &&
-            !isCreator && (
-              <button
-                onClick={() =>
-                  removeMemberMutation.mutate(member._id)
-                }
-                className="btn btn-error btn-xs"
-                title="Remove member"
-              >
-                <UserMinus size={14} />
-              </button>
-            )}
-        </div>
-      );
-    })}
-  </div>
-</div>
 
               {/* Actions */}
               <div className="space-y-2">

@@ -90,19 +90,16 @@ export const getGroupDetails = async (req, res) => {
     const userId = req.user._id;
 
     const group = await Group.findById(groupId)
-      .populate("createdBy", "name email profilePicture")
-      .populate("admins", "name email profilePicture")
-      .populate("members", "name email profilePicture")
-      .populate("pendingRequests.userId", "name email profilePicture");
+      .populate("createdBy", "_id fullName email profilePic")
+      .populate("admins", "_id fullName email profilePic")
+      .populate("members", "_id fullName email profilePic")
+      .populate("pendingRequests.userId", "_id fullName email profilePic");
 
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    // Check if user is admin
     const isAdmin = group.admins.some(admin => admin._id.toString() === userId.toString());
-    
-    // Check if user is member
     const isMember = group.members.some(member => member._id.toString() === userId.toString());
 
     res.status(200).json({ 
