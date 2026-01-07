@@ -13,6 +13,9 @@ import NotificationsPage from "./pages/NotificationsPage.jsx";
 import CallPage from "./pages/CallPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
+import GroupsPage from "./pages/GroupsPage.jsx";
+import GroupChatPage from "./pages/GroupChatPage.jsx";
+
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -111,6 +114,10 @@ const App = () => {
             )
           }
         />
+
+     <Route path="/groups" element={<GroupsPage />} />
+<Route path="/groups/:groupId" element={<GroupChatPage authUser={authUser} />} />
+
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" />} />

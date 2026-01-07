@@ -64,6 +64,74 @@ export async function acceptFriendRequest(requestId) {
 }
 
 export async function getStreamToken() {
-  const response = await axiosInstance.get("chat/token");
-  return response.data;
+  const res = await axiosInstance.get("/chat/token");
+  return res.data;
+}
+
+// -------- GROUP CHAT API ---------
+
+// Create a new group
+export async function createGroup(groupData) {
+  const res = await axiosInstance.post("/groups/create", groupData);
+  return res.data;
+}
+
+// Get all public groups
+export async function getAllGroups() {
+  const res = await axiosInstance.get("/groups/all");
+  return res.data;
+}
+
+// Get user's groups
+export async function getUserGroups() {
+  const res = await axiosInstance.get("/groups/my-groups");
+  return res.data;
+}
+
+// Get group details
+export async function getGroupDetails(groupId) {
+  const res = await axiosInstance.get(`/groups/${groupId}`);
+  return res.data;
+}
+
+// Request to join group
+export async function requestJoinGroup(groupId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/request-join`);
+  return res.data;
+}
+
+// Approve join request (admin)
+export async function approveJoinRequest(groupId, userId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/approve/${userId}`);
+  return res.data;
+}
+
+// Reject join request (admin)
+export async function rejectJoinRequest(groupId, userId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/reject/${userId}`);
+  return res.data;
+}
+
+// Remove member (admin)
+export async function removeMember(groupId, userId) {
+  const res = await axiosInstance.delete(`/groups/${groupId}/members/${userId}`);
+  return res.data;
+}
+
+// Make user admin (creator)
+export async function makeAdmin(groupId, userId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/make-admin/${userId}`);
+  return res.data;
+}
+
+// Leave group
+export async function leaveGroup(groupId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/leave`);
+  return res.data;
+}
+
+// Delete group (creator)
+export async function deleteGroup(groupId) {
+  const res = await axiosInstance.delete(`/groups/${groupId}`);
+  return res.data;
 }

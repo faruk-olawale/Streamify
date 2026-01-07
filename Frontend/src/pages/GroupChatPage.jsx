@@ -1,0 +1,501 @@
+import { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate } from "react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import {
+  getGroupDetails,
+  requestJoinGroup,
+  approveJoinRequest,
+  rejectJoinRequest,
+  removeMember,
+  leaveGroup,
+  deleteGroup,
+  getStreamToken,
+} from "../lib/api";
+import { StreamChat } from "stream-chat";
+import {
+  Chat,
+  Channel,
+  ChannelHeader,
+  MessageList,
+  MessageInput,
+  Window,
+  Thread,
+  TypingIndicator,
+} from "stream-chat-react";
+import "stream-chat-react/dist/css/v2/index.css";
+import {
+  ArrowLeft,
+  Users,
+  Settings,
+  UserPlus,
+  UserMinus,
+  Shield,
+  Trash2,
+  LogOut,
+  Crown,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
+
+const GroupChatPage = ({ authUser }) => {
+  const { groupId } = useParams();
+  const navigate = useNavigate();
+  const [client, setClient] = useState(null);
+  const [channel, setChannel] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const setupInProgress = useRef(false);
+  const queryClient = useQueryClient();
+
+  // Fetch group details
+  const {
+    data: groupData,
+    isLoading: loadingGroup,
+    refetch: refetchGroup,
+  } = useQuery({
+    queryKey: ["group", groupId],
+    queryFn: () => getGroupDetails(groupId),
+  });
+
+  const group = groupData?.group;
+  const userRole = groupData?.userRole;
+
+  // Setup Stream Chat
+async function setupStream() {
+  if (setupInProgress.current || !group) return;
+  setupInProgress.current = true;
+
+  try {
+    // Get Stream token
+    const tokenData = await getStreamToken();
+    
+    if (!tokenData || !tokenData.token || !tokenData.user) {
+      throw new Error("Invalid token data received");
+    }
+
+    const { token, user } = tokenData;
+
+    const streamClient = StreamChat.getInstance(
+      import.meta.env.VITE_STREAM_API_KEY
+    );
+
+    await streamClient.connectUser(
+      {
+        id: user._id,
+        name: user.name,
+        image: user.profilePicture,
+      },
+      token
+    );
+
+    const groupChannel = streamClient.channel(
+      "messaging",
+      group.streamChannelId
+    );
+    await groupChannel.watch();
+
+    setClient(streamClient);
+    setChannel(groupChannel);
+  } catch (err) {
+    console.error("Stream setup error:", err);
+    toast.error("Could not connect to chat. Please try again.");
+  } finally {
+    setupInProgress.current = false;
+  }
+}
+
+  useEffect(() => {
+    if (group && userRole?.isMember && !client) {
+      setupStream();
+    }
+  }, [group, userRole, client]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (client) {
+        client.disconnectUser().catch(console.error);
+      }
+    };
+  }, [client]);
+
+  // Request to join mutation
+  const requestJoinMutation = useMutation({
+    mutationFn: () => requestJoinGroup(groupId),
+    onSuccess: () => {
+      toast.success("Join request sent!");
+      refetchGroup();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to send request");
+    },
+  });
+
+  // Approve request mutation
+  const approveRequestMutation = useMutation({
+    mutationFn: (userId) => approveJoinRequest(groupId, userId),
+    onSuccess: () => {
+      toast.success("User approved!");
+      refetchGroup();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to approve");
+    },
+  });
+
+  // Reject request mutation
+  const rejectRequestMutation = useMutation({
+    mutationFn: (userId) => rejectJoinRequest(groupId, userId),
+    onSuccess: () => {
+      toast.success("Request rejected");
+      refetchGroup();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to reject");
+    },
+  });
+
+  // Remove member mutation
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId) => removeMember(groupId, userId),
+    onSuccess: () => {
+      toast.success("Member removed");
+      refetchGroup();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to remove member");
+    },
+  });
+
+  // Leave group mutation
+  const leaveGroupMutation = useMutation({
+    mutationFn: () => leaveGroup(groupId),
+    onSuccess: () => {
+      toast.success("Left group successfully");
+      queryClient.invalidateQueries(["my-groups"]);
+      navigate("/groups");
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to leave group");
+    },
+  });
+
+  // Delete group mutation
+  const deleteGroupMutation = useMutation({
+    mutationFn: () => deleteGroup(groupId),
+    onSuccess: () => {
+      toast.success("Group deleted successfully");
+      queryClient.invalidateQueries(["my-groups"]);
+      queryClient.invalidateQueries(["all-groups"]);
+      navigate("/groups");
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to delete group");
+    },
+  });
+
+  if (loadingGroup) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  if (!group) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Group not found</h2>
+          <button onClick={() => navigate("/groups")} className="btn btn-primary">
+            Back to Groups
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isPending = group.pendingRequests?.some(
+    (req) => req.userId._id === authUser._id
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+     <div className="bg-base-200 p-4 flex items-center justify-between border-b border-base-300">
+     <div className="flex items-center gap-3">
+    <button
+      onClick={() => navigate("/groups")}
+      className="btn btn-ghost btn-sm btn-circle"
+    >
+      <ArrowLeft size={20} />
+    </button>
+    <div className="avatar">
+      <div className="w-10 h-10 rounded-lg">
+        <img 
+          src={group.image || 'https://via.placeholder.com/150?text=Group'} 
+          alt={group.name}
+          onError={(e) => {
+            e.target.src = 'https://ui-avatars.com/api/?name=' + group.name + '&background=random'
+          }}
+        />
+      </div>
+    </div>
+    <div>
+      <h2 className="font-bold text-lg">{group.name}</h2>
+      <p className="text-sm text-base-content/60">
+        {group.members?.length || 0} members
+      </p>
+    </div>
+  </div>
+
+  {userRole?.isMember && (
+    <button
+      onClick={() => setShowSettings(!showSettings)}
+      className="btn btn-ghost btn-sm gap-2"
+    >
+      <Settings size={20} />
+      {userRole.isAdmin && <Shield size={16} className="text-warning" />}
+    </button>
+  )}
+</div>
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col">
+          {!userRole?.isMember ? (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="text-center max-w-md">
+                <Users size={64} className="mx-auto text-base-content/30 mb-4" />
+                <h3 className="text-xl font-bold mb-2">Join this group</h3>
+                <p className="text-base-content/60 mb-6">
+                  {group.description || "No description available"}
+                </p>
+                {isPending ? (
+                  <div className="alert alert-info">
+                    <span>Your join request is pending approval</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => requestJoinMutation.mutate()}
+                    className="btn btn-primary"
+                    disabled={requestJoinMutation.isPending}
+                  >
+                    {requestJoinMutation.isPending ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm"></span>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={20} />
+                        Request to Join
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : client && channel ? (
+            <Chat client={client}>
+              <Channel channel={channel}>
+                <Window>
+                  <ChannelHeader />
+                  <MessageList />
+                  <TypingIndicator />
+                  <MessageInput />
+                </Window>
+                <Thread />
+              </Channel>
+            </Chat>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <span className="loading loading-spinner loading-lg"></span>
+            </div>
+          )}
+        </div>
+
+        {/* Settings Sidebar */}
+        {showSettings && userRole?.isMember && (
+          <div className="w-80 bg-base-200 border-l border-base-300 overflow-y-auto">
+            <div className="p-4">
+              <h3 className="font-bold text-lg mb-4">Group Settings</h3>
+
+              {/* Group Info */}
+              <div className="mb-6">
+                <h4 className="font-semibold mb-2">About</h4>
+                <p className="text-sm text-base-content/70">
+                  {group.description || "No description"}
+                </p>
+                <div className="mt-2 text-sm text-base-content/60">
+                  <p>Created by: {group.createdBy?.name}</p>
+                  <p>{group.members?.length || 0} members</p>
+                </div>
+              </div>
+
+              {/* Pending Requests (Admin Only) */}
+      {userRole.isAdmin && group.pendingRequests?.length > 0 && (
+       <div className="mb-6">
+        <h4 className="font-semibold mb-2">
+          Pending Requests ({group.pendingRequests.length})
+        </h4>
+        <div className="space-y-2">
+          {group.pendingRequests.map((request) => (
+            <div
+          key={request.userId._id}
+          className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
+        >
+          <div className="flex items-center gap-2">
+            <div className="avatar">
+              <div className="w-8 h-8 rounded-full">
+                <img
+                  src={request.userId.profilePicture || request.userId.profilePic || 'https://via.placeholder.com/100'}
+                  alt={request.userId.name}
+                  onError={(e) => {
+                    e.target.src = 'https://ui-avatars.com/api/?name=' + (request.userId.name || 'User') + '&background=random'
+                  }}
+                />
+              </div>
+            </div>
+            <span className="text-sm font-medium">
+              {request.userId.name}
+            </span>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() =>
+                approveRequestMutation.mutate(request.userId._id)
+              }
+              className="btn btn-success btn-xs"
+              title="Approve"
+            >
+              <CheckCircle size={14} />
+            </button>
+            <button
+              onClick={() =>
+                rejectRequestMutation.mutate(request.userId._id)
+              }
+              className="btn btn-error btn-xs"
+              title="Reject"
+            >
+              <XCircle size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+              {/* Members List */}
+     <div className="mb-6">
+      <h4 className="font-semibold mb-2">
+        Members ({group.members?.length || 0})
+      </h4>
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+      {group.members?.map((member) => {
+        const isAdmin = group.admins?.some(
+          (admin) => admin._id === member._id
+        );
+        const isCreator = group.createdBy?._id === member._id;
+
+      return (
+        <div
+          key={member._id}
+          className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
+        >
+          <div className="flex items-center gap-2">
+            <div className="avatar">
+              <div className="w-8 h-8 rounded-full">
+                <img
+                  src={member.profilePicture || member.profilePic || 'https://via.placeholder.com/100'}
+                  alt={member.name}
+                  onError={(e) => {
+                    e.target.src = 'https://ui-avatars.com/api/?name=' + (member.name || 'User') + '&background=random'
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <span className="text-sm font-medium">
+                {member.name}
+              </span>
+              {isCreator && (
+                <Crown
+                  size={14}
+                  className="inline ml-1 text-warning"
+                />
+              )}
+              {isAdmin && !isCreator && (
+                <Shield
+                  size={14}
+                  className="inline ml-1 text-info"
+                />
+              )}
+            </div>
+          </div>
+          {userRole.isAdmin &&
+            member._id !== authUser._id &&
+            !isCreator && (
+              <button
+                onClick={() =>
+                  removeMemberMutation.mutate(member._id)
+                }
+                className="btn btn-error btn-xs"
+                title="Remove member"
+              >
+                <UserMinus size={14} />
+              </button>
+            )}
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+              {/* Actions */}
+              <div className="space-y-2">
+                {!userRole.isCreator && (
+                  <button
+                    onClick={() => {
+                      if (
+                        confirm("Are you sure you want to leave this group?")
+                      ) {
+                        leaveGroupMutation.mutate();
+                      }
+                    }}
+                    className="btn btn-warning btn-block gap-2"
+                    disabled={leaveGroupMutation.isPending}
+                  >
+                    <LogOut size={18} />
+                    Leave Group
+                  </button>
+                )}
+
+                {userRole.isCreator && (
+                  <button
+                    onClick={() => {
+                      if (
+                        confirm(
+                          "Are you sure you want to delete this group? This action cannot be undone."
+                        )
+                      ) {
+                        deleteGroupMutation.mutate();
+                      }
+                    }}
+                    className="btn btn-error btn-block gap-2"
+                    disabled={deleteGroupMutation.isPending}
+                  >
+                    <Trash2 size={18} />
+                    Delete Group
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default GroupChatPage;
