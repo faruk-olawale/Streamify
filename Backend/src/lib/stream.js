@@ -31,3 +31,28 @@ export const generateStreamToken =  (userId) => {
          
     }
 };
+
+export const createGroupChannel = async () => {
+  try {
+    const channel = streamClient.channel("messaging", "global-chat", {
+      name: "Global Group Chat",
+      image: "https://getstream.io/random_png/?id=global&name=Global%20Chat",
+      members: [],        // nobody joins until approved
+      created_by_id: "admin", // optional if you want
+    });
+
+    await channel.create();
+    return channel;
+  } catch (error) {
+    console.log("Error creating group channel:", error);
+  }
+};
+
+export const addUserToGroup = async (userId) => {
+  try {
+    const channel = streamClient.channel("messaging", "global-chat");
+    await channel.addMembers([userId]);
+  } catch (error) {
+    console.log("Error adding user to group:", error);
+  }
+};

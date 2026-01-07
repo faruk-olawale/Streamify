@@ -32,7 +32,9 @@ const Navbar = () => {
 
   const isChatPage = location.pathname.startsWith("/chat");
   const isNotificationsPage = location.pathname === "/notifications";
-  const showBackArrow = isChatPage || isNotificationsPage;
+
+  // Show back arrow only on Notifications page
+  const showBackArrow = isNotificationsPage;
 
   // Fetch friend requests
   const { data: friendRequests } = useQuery({
@@ -60,7 +62,7 @@ const Navbar = () => {
       <div className='container mx-auto px-4 lg:px-8'>
         <div className='flex items-center justify-end w-full'>
 
-          {/* BACK ARROW */}
+          {/* BACK ARROW - ONLY ON NOTIFICATIONS PAGE */}
           {showBackArrow && (
             <div className='mr-auto lg:hidden'>
               <button
