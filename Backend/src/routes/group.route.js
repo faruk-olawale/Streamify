@@ -5,6 +5,7 @@ import {
   getAllGroups,
   getUserGroups,
   getGroupDetails,
+  updateGroup,
   requestJoinGroup,
   approveJoinRequest,
   rejectJoinRequest,
@@ -32,5 +33,7 @@ router.post("/:groupId/reject/:userId", protectRoute, rejectJoinRequest);
 router.delete("/:groupId/members/:userId", protectRoute, removeMember);
 router.post("/:groupId/make-admin/:userId", protectRoute, makeAdmin);
 router.post("/:groupId/leave", protectRoute, leaveGroup);
+
+router.patch("/:groupId", protectRoute, updateGroup);
 
 export default router;

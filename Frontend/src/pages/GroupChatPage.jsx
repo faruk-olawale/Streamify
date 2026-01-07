@@ -36,7 +36,9 @@ import {
   Crown,
   CheckCircle,
   XCircle,
+  Edit,
 } from "lucide-react";
+import EditGroupModal from "../component/EditGroupModal";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
@@ -44,6 +46,7 @@ const GroupChatPage = ({ authUser }) => {
   const [client, setClient] = useState(null);
   const [channel, setChannel] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const setupInProgress = useRef(false);
   const queryClient = useQueryClient();
 
@@ -231,13 +234,19 @@ const GroupChatPage = ({ authUser }) => {
           </button>
           <div className="avatar">
             <div className="w-10 h-10 rounded-lg">
-              <img src={group.image} alt={group.name} />
+              <img 
+                src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                alt={group.name}
+                onError={(e) => {
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+                }}
+              />
             </div>
           </div>
           <div>
             <h2 className="font-bold text-lg">{group.name}</h2>
             <p className="text-sm text-base-content/60">
-              {group.members?.length || 0} members
+              {group.members?.length || 0} {group.members?.length === 1 ? 'member' : 'members'}
             </p>
           </div>
         </div>
@@ -271,7 +280,7 @@ const GroupChatPage = ({ authUser }) => {
                 ) : (
                   <button
                     onClick={() => requestJoinMutation.mutate()}
-                    className="btn btn-primary"
+                    className="btn btn-primary gap-2"
                     disabled={requestJoinMutation.isPending}
                   >
                     {requestJoinMutation.isPending ? (
@@ -316,13 +325,47 @@ const GroupChatPage = ({ authUser }) => {
 
               {/* Group Info */}
               <div className="mb-6">
-                <h4 className="font-semibold mb-2">About</h4>
-                <p className="text-sm text-base-content/70">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">About</h4>
+                  {userRole.isAdmin && (
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="btn btn-ghost btn-xs gap-1"
+                    >
+                      <Edit size={14} />
+                      Edit
+                    </button>
+                  )}
+                </div>
+                
+                {/* Group Image */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="avatar">
+                    <div className="w-16 h-16 rounded-lg">
+                      <img 
+                        src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                        alt={group.name}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold">{group.name}</h5>
+                    <p className="text-xs text-base-content/60">
+                      {group.members?.length || 0} members
+                    </p>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-base-content/70 mb-2">
                   {group.description || "No description"}
                 </p>
-                <div className="mt-2 text-sm text-base-content/60">
-                  <p>Created by: {group.createdBy?.fullName || group.createdBy?.name}</p>
-                  <p>{group.members?.length || 0} members</p>
+                
+                <div className="flex items-center gap-2 text-sm text-base-content/60">
+                  <Crown size={14} className="text-warning" />
+                  <span>Created by {group.createdBy?.fullName}</span>
                 </div>
               </div>
 
@@ -338,35 +381,44 @@ const GroupChatPage = ({ authUser }) => {
                         key={request.userId._id}
                         className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
                           <div className="avatar">
                             <div className="w-8 h-8 rounded-full">
                               <img
                                 src={request.userId.profilePic}
                                 alt={request.userId.fullName}
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
+                                }}
                               />
                             </div>
                           </div>
-                          <span className="text-sm font-medium">
+                          <span className="text-sm font-medium truncate">
                             {request.userId.fullName}
                           </span>
                         </div>
                         <div className="flex gap-1">
                           <button
-                            onClick={() =>
-                              approveRequestMutation.mutate(request.userId._id)
-                            }
+                            onClick={() => {
+                              if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
+                                approveRequestMutation.mutate(request.userId._id);
+                              }
+                            }}
                             className="btn btn-success btn-xs"
                             title="Approve"
+                            disabled={approveRequestMutation.isPending}
                           >
                             <CheckCircle size={14} />
                           </button>
                           <button
-                            onClick={() =>
-                              rejectRequestMutation.mutate(request.userId._id)
-                            }
+                            onClick={() => {
+                              if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
+                                rejectRequestMutation.mutate(request.userId._id);
+                              }
+                            }}
                             className="btn btn-error btn-xs"
                             title="Reject"
+                            disabled={rejectRequestMutation.isPending}
                           >
                             <XCircle size={14} />
                           </button>
@@ -394,42 +446,52 @@ const GroupChatPage = ({ authUser }) => {
                         key={member._id}
                         className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
                           <div className="avatar">
                             <div className="w-8 h-8 rounded-full">
                               <img
                                 src={member.profilePic}
                                 alt={member.fullName}
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                                }}
                               />
                             </div>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium">
-                              {member.fullName}
-                            </span>
-                            {isCreator && (
-                              <Crown
-                                size={14}
-                                className="inline ml-1 text-warning"
-                              />
-                            )}
-                            {isAdmin && !isCreator && (
-                              <Shield
-                                size={14}
-                                className="inline ml-1 text-info"
-                              />
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium truncate">
+                                {member.fullName}
+                              </span>
+                              {isCreator && (
+                                <Crown
+                                  size={14}
+                                  className="flex-shrink-0 text-warning"
+                                  title="Creator"
+                                />
+                              )}
+                              {isAdmin && !isCreator && (
+                                <Shield
+                                  size={14}
+                                  className="flex-shrink-0 text-info"
+                                  title="Admin"
+                                />
+                              )}
+                            </div>
                           </div>
                         </div>
                         {userRole.isAdmin &&
                           member._id !== authUser._id &&
                           !isCreator && (
                             <button
-                              onClick={() =>
-                                removeMemberMutation.mutate(member._id)
-                              }
+                              onClick={() => {
+                                if (confirm(`Remove ${member.fullName} from the group?`)) {
+                                  removeMemberMutation.mutate(member._id);
+                                }
+                              }}
                               className="btn btn-error btn-xs"
                               title="Remove member"
+                              disabled={removeMemberMutation.isPending}
                             >
                               <UserMinus size={14} />
                             </button>
@@ -482,6 +544,14 @@ const GroupChatPage = ({ authUser }) => {
           </div>
         )}
       </div>
+
+      {/* Edit Group Modal */}
+      {showEditModal && (
+        <EditGroupModal
+          group={group}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
     </div>
   );
 };

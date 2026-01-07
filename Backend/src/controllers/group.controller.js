@@ -374,3 +374,53 @@ export const deleteGroup = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Update group details (admin only)
+export const updateGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name, description, image } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Check if user is admin
+    if (!group.admins.some(admin => admin.toString() === userId.toString())) {
+      return res.status(403).json({ message: "Only admins can update group details" });
+    }
+
+    // Update fields
+    if (name) group.name = name.trim();
+    if (description !== undefined) group.description = description.trim();
+    if (image !== undefined) group.image = image.trim();
+
+    await group.save();
+
+    // Update Stream channel data
+    try {
+      await updateChannelData(group.streamChannelId, {
+        name: group.name,
+        image: group.image,
+      });
+    } catch (streamError) {
+      console.error("Error updating Stream channel:", streamError);
+    }
+
+    const populatedGroup = await Group.findById(group._id)
+      .populate("createdBy", "_id fullName email profilePic")
+      .populate("admins", "_id fullName email profilePic")
+      .populate("members", "_id fullName email profilePic");
+
+    res.status(200).json({ 
+      message: "Group updated successfully",
+      group: populatedGroup 
+    });
+  } catch (error) {
+    console.error("Error in updateGroup:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

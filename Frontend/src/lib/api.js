@@ -135,3 +135,9 @@ export async function deleteGroup(groupId) {
   const res = await axiosInstance.delete(`/groups/${groupId}`);
   return res.data;
 }
+
+// Update group details (admin)
+export async function updateGroup(groupId, updateData) {
+  const res = await axiosInstance.patch(`/groups/${groupId}`, updateData);
+  return res.data;
+}
