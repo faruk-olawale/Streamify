@@ -37,6 +37,7 @@ import {
   CheckCircle,
   XCircle,
   Edit,
+  X,
 } from "lucide-react";
 import EditGroupModal from "../component/EditGroupModal";
 
@@ -207,9 +208,9 @@ const GroupChatPage = ({ authUser }) => {
   if (!group) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Group not found</h2>
-          <button onClick={() => navigate("/groups")} className="btn btn-primary">
+        <div className="text-center p-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-2">Group not found</h2>
+          <button onClick={() => navigate("/groups")} className="btn btn-primary btn-sm md:btn-md">
             Back to Groups
           </button>
         </div>
@@ -224,16 +225,16 @@ const GroupChatPage = ({ authUser }) => {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-base-200 p-4 flex items-center justify-between border-b border-base-300">
-        <div className="flex items-center gap-3">
+      <div className="bg-base-200 p-3 md:p-4 flex items-center justify-between border-b border-base-300">
+        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           <button
             onClick={() => navigate("/groups")}
-            className="btn btn-ghost btn-sm btn-circle"
+            className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} className="md:w-5 md:h-5" />
           </button>
-          <div className="avatar">
-            <div className="w-10 h-10 rounded-lg">
+          <div className="avatar flex-shrink-0">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg">
               <img 
                 src={group.image || "https://via.placeholder.com/150?text=Group"} 
                 alt={group.name}
@@ -243,9 +244,9 @@ const GroupChatPage = ({ authUser }) => {
               />
             </div>
           </div>
-          <div>
-            <h2 className="font-bold text-lg">{group.name}</h2>
-            <p className="text-sm text-base-content/60">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-bold text-sm md:text-lg truncate">{group.name}</h2>
+            <p className="text-xs md:text-sm text-base-content/60">
               {group.members?.length || 0} {group.members?.length === 1 ? 'member' : 'members'}
             </p>
           </div>
@@ -254,33 +255,33 @@ const GroupChatPage = ({ authUser }) => {
         {userRole?.isMember && (
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="btn btn-ghost btn-sm gap-2"
+            className="btn btn-ghost btn-sm gap-1 md:gap-2 flex-shrink-0"
           >
-            <Settings size={20} />
-            {userRole.isAdmin && <Shield size={16} className="text-warning" />}
+            <Settings size={18} className="md:w-5 md:h-5" />
+            {userRole.isAdmin && <Shield size={14} className="md:w-4 md:h-4 text-warning" />}
           </button>
         )}
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
           {!userRole?.isMember ? (
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="text-center max-w-md">
-                <Users size={64} className="mx-auto text-base-content/30 mb-4" />
-                <h3 className="text-xl font-bold mb-2">Join this group</h3>
-                <p className="text-base-content/60 mb-6">
+                <Users size={48} className="md:w-16 md:h-16 mx-auto text-base-content/30 mb-4" />
+                <h3 className="text-lg md:text-xl font-bold mb-2">Join this group</h3>
+                <p className="text-sm md:text-base text-base-content/60 mb-6">
                   {group.description || "No description available"}
                 </p>
                 {isPending ? (
-                  <div className="alert alert-info">
+                  <div className="alert alert-info text-sm">
                     <span>Your join request is pending approval</span>
                   </div>
                 ) : (
                   <button
                     onClick={() => requestJoinMutation.mutate()}
-                    className="btn btn-primary gap-2"
+                    className="btn btn-primary btn-sm md:btn-md gap-2"
                     disabled={requestJoinMutation.isPending}
                   >
                     {requestJoinMutation.isPending ? (
@@ -290,7 +291,7 @@ const GroupChatPage = ({ authUser }) => {
                       </>
                     ) : (
                       <>
-                        <UserPlus size={20} />
+                        <UserPlus size={18} className="md:w-5 md:h-5" />
                         Request to Join
                       </>
                     )}
@@ -317,231 +318,265 @@ const GroupChatPage = ({ authUser }) => {
           )}
         </div>
 
-        {/* Settings Sidebar */}
+        {/* Settings Sidebar - Mobile Drawer / Desktop Sidebar */}
         {showSettings && userRole?.isMember && (
-          <div className="w-80 bg-base-200 border-l border-base-300 overflow-y-auto">
-            <div className="p-4">
-              <h3 className="font-bold text-lg mb-4">Group Settings</h3>
-
-              {/* Group Info */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold">About</h4>
-                  {userRole.isAdmin && (
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="btn btn-ghost btn-xs gap-1"
-                    >
-                      <Edit size={14} />
-                      Edit
-                    </button>
-                  )}
+          <>
+            {/* Mobile Overlay */}
+            <div 
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={() => setShowSettings(false)}
+            ></div>
+            
+            {/* Settings Panel */}
+            <div className={`
+              fixed lg:relative
+              top-0 right-0 bottom-0
+              w-full sm:w-96 lg:w-80
+              bg-base-200 
+              border-l border-base-300 
+              overflow-y-auto
+              z-50
+              transform transition-transform duration-300
+              ${showSettings ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+            `}>
+              <div className="p-4">
+                {/* Mobile Close Button */}
+                <div className="flex items-center justify-between mb-4 lg:hidden">
+                  <h3 className="font-bold text-lg">Group Settings</h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="btn btn-ghost btn-sm btn-circle"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
-                
-                {/* Group Image */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="avatar">
-                    <div className="w-16 h-16 rounded-lg">
-                      <img 
-                        src={group.image || "https://via.placeholder.com/150?text=Group"} 
-                        alt={group.name}
-                        onError={(e) => {
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+
+                {/* Desktop Title */}
+                <h3 className="font-bold text-lg mb-4 hidden lg:block">Group Settings</h3>
+
+                {/* Group Info */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold">About</h4>
+                    {userRole.isAdmin && (
+                      <button
+                        onClick={() => {
+                          setShowEditModal(true);
+                          setShowSettings(false); // Close settings on mobile when opening edit
                         }}
-                      />
+                        className="btn btn-ghost btn-xs gap-1"
+                      >
+                        <Edit size={14} />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Group Image */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="avatar">
+                      <div className="w-16 h-16 rounded-lg">
+                        <img 
+                          src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                          alt={group.name}
+                          onError={(e) => {
+                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h5 className="font-semibold truncate">{group.name}</h5>
+                      <p className="text-xs text-base-content/60">
+                        {group.members?.length || 0} members
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <h5 className="font-semibold">{group.name}</h5>
-                    <p className="text-xs text-base-content/60">
-                      {group.members?.length || 0} members
-                    </p>
+                  
+                  <p className="text-sm text-base-content/70 mb-2">
+                    {group.description || "No description"}
+                  </p>
+                  
+                  <div className="flex items-center gap-2 text-sm text-base-content/60">
+                    <Crown size={14} className="text-warning flex-shrink-0" />
+                    <span className="truncate">Created by {group.createdBy?.fullName}</span>
                   </div>
                 </div>
-                
-                <p className="text-sm text-base-content/70 mb-2">
-                  {group.description || "No description"}
-                </p>
-                
-                <div className="flex items-center gap-2 text-sm text-base-content/60">
-                  <Crown size={14} className="text-warning" />
-                  <span>Created by {group.createdBy?.fullName}</span>
-                </div>
-              </div>
 
-              {/* Pending Requests (Admin Only) */}
-              {userRole.isAdmin && group.pendingRequests?.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="font-semibold mb-2">
-                    Pending Requests ({group.pendingRequests.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {group.pendingRequests.map((request) => (
-                      <div
-                        key={request.userId._id}
-                        className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className="avatar">
-                            <div className="w-8 h-8 rounded-full">
-                              <img
-                                src={request.userId.profilePic}
-                                alt={request.userId.fullName}
-                                onError={(e) => {
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-sm font-medium truncate">
-                            {request.userId.fullName}
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => {
-                              if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
-                                approveRequestMutation.mutate(request.userId._id);
-                              }
-                            }}
-                            className="btn btn-success btn-xs"
-                            title="Approve"
-                            disabled={approveRequestMutation.isPending}
-                          >
-                            <CheckCircle size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
-                                rejectRequestMutation.mutate(request.userId._id);
-                              }
-                            }}
-                            className="btn btn-error btn-xs"
-                            title="Reject"
-                            disabled={rejectRequestMutation.isPending}
-                          >
-                            <XCircle size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Members List */}
-              <div className="mb-6">
-                <h4 className="font-semibold mb-2">
-                  Members ({group.members?.length || 0})
-                </h4>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {group.members?.map((member) => {
-                    const isAdmin = group.admins?.some(
-                      (admin) => admin._id === member._id
-                    );
-                    const isCreator = group.createdBy?._id === member._id;
-
-                    return (
-                      <div
-                        key={member._id}
-                        className="flex items-center justify-between p-2 bg-base-100 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className="avatar">
-                            <div className="w-8 h-8 rounded-full">
-                              <img
-                                src={member.profilePic}
-                                alt={member.fullName}
-                                onError={(e) => {
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm font-medium truncate">
-                                {member.fullName}
-                              </span>
-                              {isCreator && (
-                                <Crown
-                                  size={14}
-                                  className="flex-shrink-0 text-warning"
-                                  title="Creator"
+                {/* Pending Requests (Admin Only) */}
+                {userRole.isAdmin && group.pendingRequests?.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-2">
+                      Pending Requests ({group.pendingRequests.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {group.pendingRequests.map((request) => (
+                        <div
+                          key={request.userId._id}
+                          className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="avatar flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full">
+                                <img
+                                  src={request.userId.profilePic}
+                                  alt={request.userId.fullName}
+                                  onError={(e) => {
+                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
+                                  }}
                                 />
-                              )}
-                              {isAdmin && !isCreator && (
-                                <Shield
-                                  size={14}
-                                  className="flex-shrink-0 text-info"
-                                  title="Admin"
-                                />
-                              )}
+                              </div>
                             </div>
+                            <span className="text-sm font-medium truncate">
+                              {request.userId.fullName}
+                            </span>
                           </div>
-                        </div>
-                        {userRole.isAdmin &&
-                          member._id !== authUser._id &&
-                          !isCreator && (
+                          <div className="flex gap-1 flex-shrink-0">
                             <button
                               onClick={() => {
-                                if (confirm(`Remove ${member.fullName} from the group?`)) {
-                                  removeMemberMutation.mutate(member._id);
+                                if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
+                                  approveRequestMutation.mutate(request.userId._id);
+                                }
+                              }}
+                              className="btn btn-success btn-xs"
+                              title="Approve"
+                              disabled={approveRequestMutation.isPending}
+                            >
+                              <CheckCircle size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
+                                  rejectRequestMutation.mutate(request.userId._id);
                                 }
                               }}
                               className="btn btn-error btn-xs"
-                              title="Remove member"
-                              disabled={removeMemberMutation.isPending}
+                              title="Reject"
+                              disabled={rejectRequestMutation.isPending}
                             >
-                              <UserMinus size={14} />
+                              <XCircle size={14} />
                             </button>
-                          )}
-                      </div>
-                    );
-                  })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Members List */}
+                <div className="mb-6">
+                  <h4 className="font-semibold mb-2">
+                    Members ({group.members?.length || 0})
+                  </h4>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {group.members?.map((member) => {
+                      const isAdmin = group.admins?.some(
+                        (admin) => admin._id === member._id
+                      );
+                      const isCreator = group.createdBy?._id === member._id;
+
+                      return (
+                        <div
+                          key={member._id}
+                          className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="avatar flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full">
+                                <img
+                                  src={member.profilePic}
+                                  alt={member.fullName}
+                                  onError={(e) => {
+                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm font-medium truncate">
+                                  {member.fullName}
+                                </span>
+                                {isCreator && (
+                                  <Crown
+                                    size={14}
+                                    className="flex-shrink-0 text-warning"
+                                    title="Creator"
+                                  />
+                                )}
+                                {isAdmin && !isCreator && (
+                                  <Shield
+                                    size={14}
+                                    className="flex-shrink-0 text-info"
+                                    title="Admin"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {userRole.isAdmin &&
+                            member._id !== authUser._id &&
+                            !isCreator && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Remove ${member.fullName} from the group?`)) {
+                                    removeMemberMutation.mutate(member._id);
+                                  }
+                                }}
+                                className="btn btn-error btn-xs flex-shrink-0"
+                                title="Remove member"
+                                disabled={removeMemberMutation.isPending}
+                              >
+                                <UserMinus size={14} />
+                              </button>
+                            )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  {!userRole.isCreator && (
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm("Are you sure you want to leave this group?")
+                        ) {
+                          leaveGroupMutation.mutate();
+                        }
+                      }}
+                      className="btn btn-warning btn-block gap-2 btn-sm md:btn-md"
+                      disabled={leaveGroupMutation.isPending}
+                    >
+                      <LogOut size={16} className="md:w-[18px] md:h-[18px]" />
+                      Leave Group
+                    </button>
+                  )}
+
+                  {userRole.isCreator && (
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm(
+                            "Are you sure you want to delete this group? This action cannot be undone."
+                          )
+                        ) {
+                          deleteGroupMutation.mutate();
+                        }
+                      }}
+                      className="btn btn-error btn-block gap-2 btn-sm md:btn-md"
+                      disabled={deleteGroupMutation.isPending}
+                    >
+                      <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
+                      Delete Group
+                    </button>
+                  )}
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="space-y-2">
-                {!userRole.isCreator && (
-                  <button
-                    onClick={() => {
-                      if (
-                        confirm("Are you sure you want to leave this group?")
-                      ) {
-                        leaveGroupMutation.mutate();
-                      }
-                    }}
-                    className="btn btn-warning btn-block gap-2"
-                    disabled={leaveGroupMutation.isPending}
-                  >
-                    <LogOut size={18} />
-                    Leave Group
-                  </button>
-                )}
-
-                {userRole.isCreator && (
-                  <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          "Are you sure you want to delete this group? This action cannot be undone."
-                        )
-                      ) {
-                        deleteGroupMutation.mutate();
-                      }
-                    }}
-                    className="btn btn-error btn-block gap-2"
-                    disabled={deleteGroupMutation.isPending}
-                  >
-                    <Trash2 size={18} />
-                    Delete Group
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
