@@ -6,6 +6,11 @@ const BottomNav = () => {
   const location = useLocation();
   const { authUser } = useAuthUser();
 
+  // Hide BottomNav on ChatPage and GroupChatPage
+  if (location.pathname.startsWith("/chat") || location.pathname.startsWith("/groups/")) {
+    return null;
+  }
+
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
@@ -18,24 +23,20 @@ const BottomNav = () => {
         <Link
           to="/"
           className={`flex flex-col items-center justify-center w-16 h-12 rounded-lg transition-colors ${
-            isActive("/") && !location.pathname.startsWith("/chat")
-              ? "text-primary"
-              : "text-base-content/60"
+            isActive("/") ? "text-primary" : "text-base-content/60"
           }`}
         >
-          <Home size={24} className={isActive("/") && !location.pathname.startsWith("/chat") ? "fill-current" : ""} />
+          <Home size={24} className={isActive("/") ? "fill-current" : ""} />
         </Link>
 
         {/* Friends/Chat */}
         <Link
           to="/friends"
           className={`flex flex-col items-center justify-center w-16 h-12 rounded-lg transition-colors ${
-            isActive("/friends") || isActive("/chat")
-              ? "text-primary"
-              : "text-base-content/60"
+            isActive("/friends") ? "text-primary" : "text-base-content/60"
           }`}
         >
-          <MessageCircle size={24} className={isActive("/friends") || isActive("/chat") ? "fill-current" : ""} />
+          <MessageCircle size={24} className={isActive("/friends") ? "fill-current" : ""} />
         </Link>
 
         {/* Groups */}
@@ -56,7 +57,10 @@ const BottomNav = () => {
           }`}
         >
           {authUser?.profilePic ? (
-            <div className={`avatar ${isActive("/profile") ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100" : ""}`}>
+            <div
+              className={`avatar ${isActive("/profile") ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100" : ""
+                }`}
+            >
               <div className="w-7 h-7 rounded-full">
                 <img src={authUser.profilePic} alt="Profile" />
               </div>
