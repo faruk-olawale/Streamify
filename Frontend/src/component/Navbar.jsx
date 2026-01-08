@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { logout, getFriendReqests } from '../lib/api';
 import { Link } from 'react-router';
-import { ShipWheelIcon, BellIcon, LogOutIcon, ArrowLeft } from 'lucide-react';
+import { ShipWheelIcon, BellIcon, LogOutIcon, ArrowLeft, UsersIcon } from 'lucide-react';
 import ThemeSelector from './ThemeSelector';
 
 // Utility: Check if accepted request is still visible and format time
@@ -89,6 +89,11 @@ const Navbar = () => {
           )}
 
           <div className='flex items-center gap-3 sm:gap-4 ml-auto'>
+              <Link to="/groups" className="flex items-center gap-2.5">
+             <div className='btn btn-ghost btn-circle'>
+              <UsersIcon className="h-6 w-6 text-base-content opacity-70" />
+            </div>
+            </Link>
 
             {/* NOTIFICATIONS ICON */}
             <Link to={"/notifications"}>
