@@ -19,8 +19,7 @@ const ProfilePage = () => {
   });
 
   return (
-  <div className="bg-base-100 pt-0 flex flex-col ">
-
+  <div className="bg-base-100 pt-0 flex flex-col pb-28 ">
 
       {/* Header */}
       <div className="bg-base-200 p-6 text-center flex-shrink-0">
