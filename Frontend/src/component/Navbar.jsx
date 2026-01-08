@@ -58,74 +58,75 @@ const Navbar = () => {
   });
 
   return (
-    <nav className='bg-base-200 border-b border-base-300 sticky top-0 z-30 h-16 flex items-center'>
-      <div className='container mx-auto px-4 lg:px-8'>
-        <div className='flex items-center justify-end w-full'>
+   <nav className='bg-base-200 border-b border-base-300 sticky top-0 z-30 h-16 flex items-center'>
+  <div className='container mx-auto px-4 lg:px-8'>
+    <div className='flex items-center w-full'>
 
-          {/* BACK ARROW - ONLY ON NOTIFICATIONS PAGE */}
-          {showBackArrow && (
-            <div className='mr-auto lg:hidden'>
-              <button
-                onClick={() => navigate("/")}
-                className='btn btn-ghost btn-circle'
-                aria-label="Back to home"
-              >
-                <ArrowLeft className="h-6 w-6 text-base-content opacity-70" />
-              </button>
-            </div>
-          )}
+      {/* LEFT SIDE – STREAMIFY LOGO (CHAT PAGE ONLY) */}
+      {isChatPage && (
+        <Link to="/" className="flex items-center gap-2.5">
+          <ShipWheelIcon className="size-6 text-primary" />
+          <span className='text-2xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r
+            from-primary to-secondary tracking-wider'>
+            Streamify
+          </span>
+        </Link>
+      )}
 
-          {/* CHAT PAGE LOGO */}
-          {isChatPage && (
-            <div className='pl-5'>
-              <Link to="/" className="flex items-center gap-2.5">
-                <ShipWheelIcon className="size-9 text-primary" />
-                <span className='text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r
-                  from-primary to-secondary tracking-wider'>
-                  Streamify
-                </span>
-              </Link>
-            </div> 
-          )}
+      {/* DEFAULT LEFT (NON-CHAT PAGES) */}
+      {!isChatPage && showBackArrow && (
+        <button
+          onClick={() => navigate("/")}
+          className='btn btn-ghost btn-circle mr-auto'
+        >
+          <ArrowLeft className="h-6 w-6 opacity-70" />
+        </button>
+      )}
 
-          <div className='flex items-center gap-3 sm:gap-4 ml-auto'>
+      {/* RIGHT SIDE */}
+      <div className='flex items-center gap-3 ml-auto'>
 
-              <Link to="/groups" className="flex items-center gap-2.5">
-             <div className='btn btn-ghost btn-circle'>
-              <UsersIcon className="h-6 w-6 text-base-content opacity-70" />
-            </div>
+        {/* 👇 SHOW THESE ONLY WHEN NOT ON CHAT PAGE */}
+        {!isChatPage && (
+          <>
+            <Link to="/groups" className='btn btn-ghost btn-circle'>
+              <UsersIcon className="h-6 w-6 opacity-70" />
             </Link>
 
-            {/* NOTIFICATIONS ICON */}
-            <Link to={"/notifications"}>
+            <Link to="/notifications">
               <button className='btn btn-ghost btn-circle relative'>
-                <BellIcon className="h-6 w-6 text-base-content opacity-70" />
+                <BellIcon className="h-6 w-6 opacity-70" />
                 {notificationCount > 0 && (
-                  <span className="absolute top-1 right-1 badge badge-primary badge-sm text-xs font-semibold">
+                  <span className="absolute top-1 right-1 badge badge-primary badge-sm">
                     {notificationCount > 9 ? '9+' : notificationCount}
                   </span>
                 )}
               </button>
             </Link>
 
-            <ThemeSelector />
-
-            {/* USER AVATAR */}
             <div className='avatar'>
               <div className='w-9 rounded-full'>
-                <img src={authUser?.profilePic} alt="User Avatar" rel='noreferer' />
+                <img src={authUser?.profilePic} alt="avatar" />
               </div>
             </div>
+          </>
+        )}
 
-            {/* LOGOUT */}
-            <div className='btn btn-ghost btn-circle' onClick={logoutMutation}>
-              <LogOutIcon className="h-6 w-6 text-base-content opacity-70" />
-            </div>
+        {/* 👇 ALWAYS VISIBLE */}
+        <ThemeSelector />
 
-          </div>
-        </div>
+        <button
+          className='btn btn-ghost btn-circle'
+          onClick={logoutMutation}
+        >
+          <LogOutIcon className="h-6 w-6 opacity-70" />
+        </button>
+
       </div>
-    </nav>
+    </div>
+  </div>
+   </nav>
+
   );
 };
 
