@@ -76,13 +76,16 @@ const ProfilePage = () => {
         <div className="space-y-2">
           <h3 className="font-semibold text-lg mb-2">Settings</h3>
 
-          {/* Theme Selector */}
-          <div className="card bg-base-200">
-            <div className="card-body flex-row items-center justify-between">
-              <span className="font-medium">Theme</span>
-              <ThemeSelector />
+         {/* Theme */}
+            <div className="card bg-base-200">
+            <div className="card-body flex items-center justify-between">
+                <span className="font-medium">Theme</span>
+                <div className="dropdown dropdown-top"> {/* <-- drop-up */}
+                <ThemeSelector />
+                </div>
             </div>
-          </div>
+            </div>
+
 
           {/* Logout Button */}
           <button
