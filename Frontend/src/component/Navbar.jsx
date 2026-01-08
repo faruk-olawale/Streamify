@@ -1,132 +1,134 @@
-import React from 'react';
-import useAuthUser from '../hooks/useAuthUser';
-import { useLocation, useNavigate } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { logout, getFriendReqests } from '../lib/api';
-import { Link } from 'react-router';
-import { ShipWheelIcon, BellIcon, LogOutIcon, ArrowLeft, UsersIcon } from 'lucide-react';
-import ThemeSelector from './ThemeSelector';
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ShipWheelIcon,
+  BellIcon,
+  LogOutIcon,
+  ArrowLeft,
+  UsersIcon,
+} from "lucide-react";
 
-// Utility: Check if accepted request is still visible and format time
+import useAuthUser from "../hooks/useAuthUser";
+import { logout, getFriendReqests } from "../lib/api";
+import ThemeSelector from "./ThemeSelector";
+
+// --------- Helpers ----------
 function formatTime(timestamp) {
   if (!timestamp) return "Recently";
 
-  const now = Date.now();
-  const diffMs = now - new Date(timestamp).getTime();
-  const diffSec = Math.floor(diffMs / 1000);
+  const diffMs = Date.now() - new Date(timestamp).getTime();
   const diffMin = Math.floor(diffMs / (1000 * 60));
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
 
-  if (diffSec < 60) return "Recently"; // 0–59 sec
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-  if (diffHrs < 24) return `${diffHrs} hour${diffHrs === 1 ? "" : "s"} ago`;
-  if (diffHrs < 30) return "1 day ago"; // 24–30 hours
-  return null; // Remove after 30 hours
+  if (diffMin < 1) return "Recently";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffHrs < 24) return `${diffHrs} hr ago`;
+  if (diffHrs < 30) return "1 day ago";
+  return null;
 }
 
+// --------- Component ----------
 const Navbar = () => {
   const { authUser } = useAuthUser();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const isHomePage = location.pathname === "/";
   const isChatPage = location.pathname.startsWith("/chat");
   const isNotificationsPage = location.pathname === "/notifications";
 
-  // Show back arrow only on Notifications page
-  const showBackArrow = isNotificationsPage;
-
-  // Fetch friend requests
+  // Fetch notifications
   const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
   });
 
-  // Filter visible accepted requests for counter
-  const visibleAccepted = (friendRequests?.acceptedReqs || []).filter(
-    (n) => formatTime(n.updatedAt || n.createdAt) !== null
-  );
+  const visibleAccepted =
+    friendRequests?.acceptedReqs?.filter(
+      (n) => formatTime(n.updatedAt || n.createdAt) !== null
+    ) || [];
 
-  // Only count incoming requests + visible accepted
   const notificationCount =
-    (friendRequests?.incomingReqs?.length || 0) + visibleAccepted.length;
+    (friendRequests?.incomingReqs?.length || 0) +
+    visibleAccepted.length;
 
-  // Logout mutation
+  // Logout
   const { mutate: logoutMutation } = useMutation({
     mutationFn: logout,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["authUser"] }),
   });
 
   return (
-   <nav className='bg-base-200 border-b border-base-300 sticky top-0 z-30 h-16 flex items-center'>
-  <div className='container mx-auto px-4 lg:px-8'>
-    <div className='flex items-center w-full'>
+    <nav className="sticky top-0 z-30 h-16 bg-base-200 border-b border-base-300">
+      <div className="container mx-auto h-full px-4 lg:px-8">
+        <div className="flex h-full items-center">
 
-      {/* LEFT SIDE – STREAMIFY LOGO (CHAT PAGE ONLY) */}
-      {isChatPage && (
-        <Link to="/" className="flex items-center gap-2.5">
-          <ShipWheelIcon className="size-6 text-primary" />
-          <span className='text-2xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r
-            from-primary to-secondary tracking-wider'>
-            Streamify
-          </span>
-        </Link>
-      )}
-
-      {/* DEFAULT LEFT (NON-CHAT PAGES) */}
-      {!isChatPage && showBackArrow && (
-        <button
-          onClick={() => navigate("/")}
-          className='btn btn-ghost btn-circle mr-auto'
-        >
-          <ArrowLeft className="h-6 w-6 opacity-70" />
-        </button>
-      )}
-
-      {/* RIGHT SIDE */}
-      <div className='flex items-center gap-3 ml-auto'>
-
-        {/* 👇 SHOW THESE ONLY WHEN NOT ON CHAT PAGE */}
-        {!isChatPage && (
-          <>
-            <Link to="/groups" className='btn btn-ghost btn-circle'>
-              <UsersIcon className="h-6 w-6 opacity-70" />
+          {/* LEFT */}
+          {(isHomePage || isChatPage) && !isNotificationsPage && (
+            <Link to="/" className="flex items-center gap-2.5">
+              <ShipWheelIcon className="size-7 text-primary" />
+              {/* <span className="text-2xl font-bold font-mono bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent tracking-wider">
+                Streamify
+              </span> */}
             </Link>
+          )}
 
-            <Link to="/notifications">
-              <button className='btn btn-ghost btn-circle relative'>
-                <BellIcon className="h-6 w-6 opacity-70" />
-                {notificationCount > 0 && (
-                  <span className="absolute top-1 right-1 badge badge-primary badge-sm">
-                    {notificationCount > 9 ? '9+' : notificationCount}
-                  </span>
-                )}
-              </button>
-            </Link>
+          {isNotificationsPage && (
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-ghost btn-circle"
+            >
+              <ArrowLeft className="h-6 w-6 opacity-70" />
+            </button>
+          )}
 
-            <div className='avatar'>
-              <div className='w-9 rounded-full'>
-                <img src={authUser?.profilePic} alt="avatar" />
-              </div>
-            </div>
-          </>
-        )}
+          {/* RIGHT */}
+          <div className="ml-auto flex items-center gap-3">
 
-        {/* 👇 ALWAYS VISIBLE */}
-        <ThemeSelector />
+            {!isChatPage && (
+              <>
+                <Link to="/groups" className="btn btn-ghost btn-circle">
+                  <UsersIcon className="h-6 w-6 opacity-70" />
+                </Link>
 
-        <button
-          className='btn btn-ghost btn-circle'
-          onClick={logoutMutation}
-        >
-          <LogOutIcon className="h-6 w-6 opacity-70" />
-        </button>
+                <Link to="/notifications">
+                  <button className="btn btn-ghost btn-circle relative">
+                    <BellIcon className="h-6 w-6 opacity-70" />
+                    {notificationCount > 0 && (
+                      <span className="absolute top-1 right-1 badge badge-primary badge-sm">
+                        {notificationCount > 9 ? "9+" : notificationCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
 
+                <div className="avatar">
+                  <div className="w-9 rounded-full">
+                    <img
+                      src={authUser?.profilePic}
+                      alt="avatar"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <ThemeSelector />
+
+            <button
+              onClick={logoutMutation}
+              className="btn btn-ghost btn-circle"
+            >
+              <LogOutIcon className="h-6 w-6 opacity-70" />
+            </button>
+          </div>
+
+        </div>
       </div>
-    </div>
-  </div>
-   </nav>
-
+    </nav>
   );
 };
 
