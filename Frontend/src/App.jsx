@@ -15,7 +15,7 @@ import ChatPage from "./pages/ChatPage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
 import GroupsPage from "./pages/GroupsPage.jsx";
 import GroupChatPage from "./pages/GroupChatPage.jsx";
-
+import ProfilePage from "./pages/ProfilePage.jsx";
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -26,26 +26,24 @@ const App = () => {
 
   if (isLoading) return <PageLoader />;
 
-  console.log("authUser:", authUser);
-  console.log("isAuthenticated:", isAuthenticated);
-  console.log("isOnboarded:", isOnboarded);
-
   return (
     <div className="h-screen" data-theme={theme}>
+      <Toaster />
+
       <Routes>
         {/* Home */}
         <Route
           path="/"
           element={
-            isAuthenticated
-              ? isOnboarded
-                ? (
-                  <Layout showSidebar={true}>
-                    <HomePage />
-                  </Layout>
-                )
-                : <Navigate to="/onboarding" />
-              : <Navigate to="/login" />
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : !isOnboarded ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <Layout showSidebar={true}>
+                <HomePage />
+              </Layout>
+            )
           }
         />
 
@@ -53,11 +51,13 @@ const App = () => {
         <Route
           path="/onboarding"
           element={
-            isAuthenticated
-              ? !isOnboarded
-                ? <OnboardingPage />
-                : <Navigate to="/" />
-              : <Navigate to={!isAuthenticated ? "/login": "/onboarding" }/>
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : isOnboarded ? (
+              <Navigate to="/" replace />
+            ) : (
+              <OnboardingPage />
+            )
           }
         />
 
@@ -65,65 +65,96 @@ const App = () => {
         <Route
           path="/signup"
           element={
-            !isAuthenticated
-              ? <SignUpPage />
-              : isOnboarded
-                ? <Navigate to="/" />
-                : <Navigate to="/onboarding" />
+            !isAuthenticated ? <SignUpPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} replace />
           }
         />
         <Route
           path="/login"
           element={
-            !isAuthenticated
-              ? <LoginPage />
-              : isOnboarded
-                ? <Navigate to="/" />
-                : <Navigate to="/onboarding" />
+            !isAuthenticated ? <LoginPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} replace />
           }
         />
 
-        {/* Protected */}
+        {/* Protected Pages with Layout */}
         <Route
           path="/notifications"
-          element={isAuthenticated && isOnboarded ? (
-            <Layout showSidebar={true}>
-              <NotificationsPage/>
-            </Layout>
-          ) : (
-            <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-          )}
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <NotificationsPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+            )
+          }
         />
+
         <Route
           path="/call/:id"
-          element={isAuthenticated && isOnboarded ? (
-            <CallPage/>
-          ) : (
-            <Navigate to={!isAuthenticated ? "/login" : "/onboarding"}/>
-          )}
+          element={
+            isAuthenticated && isOnboarded ? (
+              <CallPage />
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+            )
+          }
         />
+
         <Route
           path="/chat/:id"
           element={
             isAuthenticated && isOnboarded ? (
               <Layout showSidebar={false}>
-                <ChatPage/>
+                <ChatPage />
               </Layout>
             ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
             )
           }
         />
 
-     <Route path="/groups" element={<GroupsPage />} />
-<Route path="/groups/:groupId" element={<GroupChatPage authUser={authUser} />} />
+        <Route
+          path="/groups"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <GroupsPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+            )
+          }
+        />
 
+        <Route
+          path="/groups/:groupId"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <GroupChatPage authUser={authUser} />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+            )
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <ProfilePage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+            )
+          }
+        />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
-      <Toaster />
     </div>
   );
 };
