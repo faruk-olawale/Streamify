@@ -141,3 +141,16 @@ export async function updateGroup(groupId, updateData) {
   const res = await axiosInstance.patch(`/groups/${groupId}`, updateData);
   return res.data;
 }
+
+// Upload group image
+export async function uploadGroupImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await axiosInstance.post("/upload/group-image", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return res.data;
+}
