@@ -1,38 +1,56 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getFriendReqests, acceptFriendRequest } from "../lib/api";
+import {
+  getFriendReqests,
+  acceptFriendRequest,
+  getGroupNotifications,
+  markGroupNotificationsRead,
+} from "../lib/api";
 import {
   UserCheckIcon,
   BellIcon,
   ClockIcon,
   MessagesSquareIcon,
+  Users,
+  CheckCircle,
 } from "lucide-react";
+import { Link } from "react-router";
 
-// Format time since a timestamp
 function formatTime(timestamp) {
   if (!timestamp) return "Recently";
 
-  const now = Date.now();
-  const diffMs = now - new Date(timestamp).getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffMs / (1000 * 60));
-  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
 
-  if (diffSec < 60) return "Recently"; // 0–59 sec
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-  if (diffHrs < 24) return `${diffHrs} hour${diffHrs === 1 ? "" : "s"} ago`;
-  if (diffHrs < 30) return "1 day ago"; // 24–30 hours
-  return null; // Remove after ~30 hours
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+  if (hrs < 24) return `${hrs} hr ago`;
+  if (days < 7) return `${days} days ago`;
+  return new Date(timestamp).toLocaleDateString();
 }
 
-function NotificationsPage() {
+export default function NotificationsPage() {
   const queryClient = useQueryClient();
-  const { data: friendRequests, isLoading } = useQuery({
+  const [, forceUpdate] = useState(Date.now());
+
+  const { data: friendRequests, isLoading: loadingFriends } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
   });
 
-  const { mutate: acceptRequestMutation, isPending } = useMutation({
+  const { data: groupData, isLoading: loadingGroups } = useQuery({
+    queryKey: ["groupNotifications"],
+    queryFn: getGroupNotifications,
+  });
+
+  useEffect(() => {
+    const t = setInterval(() => forceUpdate(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const { mutate: acceptFriend } = useMutation({
     mutationFn: acceptFriendRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
@@ -40,91 +58,157 @@ function NotificationsPage() {
     },
   });
 
-  const incomingRequests = friendRequests?.incomingReqs || [];
-  const acceptedRequests = friendRequests?.acceptedReqs || [];
+  const { mutate: markRead } = useMutation({
+    mutationFn: markGroupNotificationsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["groupNotifications"] });
+    },
+  });
 
-  // Re-render every minute for live time updates
-  const [, setNow] = useState(Date.now());
+  const incoming = friendRequests?.incomingReqs || [];
+  const accepted = friendRequests?.acceptedReqs || [];
+  const groupNotifications = groupData?.notifications || [];
+
+  const unreadGroups = groupNotifications.filter(n => !n.read);
+  const loading = loadingFriends || loadingGroups;
+  
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
-    return () => clearInterval(interval);
+  // User has opened notifications page
+    localStorage.setItem("notificationsSeen", "true");
   }, []);
 
-  // Filter accepted requests that are still visible
-  const visibleAccepted = acceptedRequests
-    .map((n) => ({ ...n, timeLabel: formatTime(n.updatedAt || n.createdAt) }))
-    .filter((n) => n.timeLabel !== null);
 
   return (
-    <div className="min-h-screen bg-base-100 px-4 sm:px-6 lg:px-8 py-6">
-      <div className="container mx-auto max-w-4xl space-y-8">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
-          Notifications
-        </h1>
+    <div className="min-h-screen bg-base-100 px-4 py-6 ">
+      <div className="mx-auto max-w-5xl space-y-8">
 
-        {isLoading ? (
+        {/* HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold">Notifications</h1>
+
+          {unreadGroups.length > 0 && (
+            <button
+              onClick={() => markRead()}
+              className="btn btn-ghost btn-sm gap-2 self-start sm:self-auto"
+            >
+              <CheckCircle size={16} />
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        {loading && (
           <div className="flex justify-center py-12">
-            <span className="loading-spinner loading-lg"></span>
+            <span className="loading loading-spinner loading-lg" />
           </div>
-        ) : (
+        )}
+
+        {!loading && (
           <>
-            {/* INCOMING FRIEND REQUESTS */}
-            {incomingRequests.length > 0 && (
+            {/* GROUP UPDATES */}
+            {groupNotifications.length > 0 && (
               <section className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <UserCheckIcon className="h-5 w-5 text-primary" />
-                  Friend Requests
-                  <span className="badge badge-primary ml-2">
-                    {incomingRequests.length}
-                  </span>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <Users className="h-5 w-5 text-info" />
+                  Group Updates
+                  {unreadGroups.length > 0 && (
+                    <span className="badge badge-info">{unreadGroups.length}</span>
+                  )}
                 </h2>
 
                 <div className="space-y-3">
-                  {incomingRequests.map((request) => (
-                    <div
-                      key={request._id}
-                      className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow"
+                  {groupNotifications.map(n => (
+                    <Link
+                      key={n._id}
+                      to={`/groups/${n.groupId?._id}`}
+                      onClick={() =>
+                        markRead({ notificationIds: [n._id] })
+                      }
+                      className={`card transition border ${
+                        n.read
+                          ? "bg-base-200"
+                          : "bg-info/10 border-info/30"
+                      }`}
                     >
                       <div className="card-body p-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row gap-3">
+
+                          {/* IMAGE */}
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-300 flex-shrink-0">
+                            <img
+                              src={n.groupId?.image || "/group-placeholder.png"}
+                              alt={n.groupId?.name || "Group"}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+
+                          {/* CONTENT */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold truncate">
+                              {n.groupId?.name}
+                            </h3>
+
+                            <p className="text-sm text-base-content/70 mt-1">
+                              {n.type === "approved" && "🎉 Your request was approved"}
+                              {n.type === "rejected" && "Your request was declined"}
+                              {n.type === "removed" && "You were removed from the group"}
+                            </p>
+
+                            <p className="text-xs flex items-center mt-1 text-base-content/60">
+                              <ClockIcon className="w-3 h-3 mr-1" />
+                              {formatTime(n.createdAt)}
+                            </p>
+                          </div>
+
+                          {/* BADGES */}
+                          {n.type === "approved" && (
+                            <div className="hidden sm:flex badge badge-success">
+                              Approved
+                            </div>
+                          )}
+
+                          {!n.read && (
+                            <div className="hidden sm:block w-2 h-2 bg-info rounded-full mt-2" />
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* FRIEND REQUESTS */}
+            {incoming.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <UserCheckIcon className="h-5 w-5 text-primary" />
+                  Friend Requests
+                  <span className="badge badge-primary">{incoming.length}</span>
+                </h2>
+
+                <div className="space-y-3">
+                  {incoming.map(r => (
+                    <div key={r._id} className="card bg-base-200">
+                      <div className="card-body p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
                           <div className="flex items-center gap-3">
-                            <div className="avatar">
-                              <div className="w-14 rounded-full bg-base-300">
-                                <img
-                                  src={request.sender.profilePic}
-                                  alt={request.sender.fullName}
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{request.sender.fullName}</h3>
-                              <div className="flex flex-wrap gap-1.5 mt-1">
-                                {request.sender.nativeLanguages && (
-                                  <span className="badge badge-secondary badge-sm">
-                                    Native:{" "}
-                                    {Array.isArray(request.sender.nativeLanguages)
-                                      ? request.sender.nativeLanguages.join(", ")
-                                      : request.sender.nativeLanguages}
-                                  </span>
-                                )}
-                                {request.sender.learningLanguages && (
-                                  <span className="badge badge-outline badge-sm">
-                                    Learning:{" "}
-                                    {Array.isArray(request.sender.learningLanguages)
-                                      ? request.sender.learningLanguages.join(", ")
-                                      : request.sender.learningLanguages}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            <img
+                              src={r.sender.profilePic}
+                              alt={r.sender.fullName}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                            <span className="font-semibold">
+                              {r.sender.fullName}
+                            </span>
                           </div>
 
                           <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => acceptRequestMutation(request._id)}
-                            disabled={isPending}
+                            onClick={() => acceptFriend(r._id)}
+                            className="btn btn-primary btn-sm w-full sm:w-auto"
                           >
-                            {isPending ? "Accepting..." : "Accept"}
+                            Accept
                           </button>
                         </div>
                       </div>
@@ -135,45 +219,28 @@ function NotificationsPage() {
             )}
 
             {/* NEW CONNECTIONS */}
-            {visibleAccepted.length > 0 && (
+            {accepted.length > 0 && (
               <section className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
                   <BellIcon className="h-5 w-5 text-success" />
                   New Connections
                 </h2>
 
                 <div className="space-y-3">
-                  {visibleAccepted.map((notification) => (
-                    <div
-                      key={notification._id}
-                      className="card bg-base-200 shadow-sm"
-                    >
-                      <div className="card-body p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="avatar">
-                            <div className="w-10 h-10 rounded-full">
-                              <img
-                                src={notification.recipient.profilePic}
-                                alt={notification.recipient.fullName}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{notification.recipient.fullName}</h3>
-                            <p className="text-sm my-1">
-                              You are now friends with {notification.recipient.fullName}
-                            </p>
-                            <p className="text-xs flex items-center opacity-70">
-                              <ClockIcon className="h-3 w-3 mr-1" />
-                              {notification.timeLabel}
-                            </p>
-                          </div>
-
-                          <div className="badge badge-success">
-                            <MessagesSquareIcon className="h-3 w-3 mr-1" />
-                            New Friend
-                          </div>
+                  {accepted.map(n => (
+                    <div key={n._id} className="card bg-base-200">
+                      <div className="card-body p-4 flex gap-3">
+                        <img
+                          src={n.recipient.profilePic}
+                          className="w-10 h-10 rounded-full"
+                        />
+                        <div className="flex-1">
+                          <p className="font-semibold">
+                            You are now friends with {n.recipient.fullName}
+                          </p>
+                          <p className="text-xs text-base-content/60">
+                            {formatTime(n.updatedAt || n.createdAt)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -182,24 +249,20 @@ function NotificationsPage() {
               </section>
             )}
 
-            {/* EMPTY STATE */}
-            {incomingRequests.length === 0 && visibleAccepted.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="size-16 rounded-full bg-base-300 flex items-center justify-center mb-4">
-                  <BellIcon className="size-8 opacity-40" />
+            {/* EMPTY */}
+            {incoming.length === 0 &&
+              accepted.length === 0 &&
+              groupNotifications.length === 0 && (
+                <div className="text-center py-20">
+                  <BellIcon className="mx-auto w-10 h-10 opacity-40" />
+                  <p className="mt-3 text-base-content/60">
+                    No notifications yet
+                  </p>
                 </div>
-
-                <h3 className="text-lg font-semibold mb-2">No notifications yet</h3>
-                <p className="opacity-70">
-                  When you receive friend requests or messages, they'll appear here.
-                </p>
-              </div>
-            )}
+              )}
           </>
         )}
       </div>
     </div>
   );
 }
-
-export default NotificationsPage;

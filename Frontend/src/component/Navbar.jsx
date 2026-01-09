@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 
 import useAuthUser from "../hooks/useAuthUser";
-import { logout, getFriendReqests } from "../lib/api";
+import { logout, getFriendReqests, getGroupNotifications } from "../lib/api";
 import ThemeSelector from "./ThemeSelector";
+
 
 // --------- Helpers ----------
 function formatTime(timestamp) {
@@ -19,11 +20,12 @@ function formatTime(timestamp) {
   const diffMs = Date.now() - new Date(timestamp).getTime();
   const diffMin = Math.floor(diffMs / (1000 * 60));
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffMin < 1) return "Recently";
   if (diffMin < 60) return `${diffMin} min ago`;
   if (diffHrs < 24) return `${diffHrs} hr ago`;
-  if (diffHrs < 30) return "1 day ago";
+  if (diffDays < 7) return `${diffDays} days ago`;
   return null;
 }
 
@@ -42,10 +44,16 @@ const Navbar = () => {
   const isNotificationsPage = location.pathname === "/notifications";
   const isGroupsPage = location.pathname.startsWith("/groups");
 
-  // Fetch notifications
+  // Fetch friend requests
   const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
+  });
+
+  // Fetch group notifications
+  const { data: groupNotificationsData } = useQuery({
+    queryKey: ["groupNotifications"],
+    queryFn: getGroupNotifications,
   });
 
   const visibleAccepted =
@@ -53,8 +61,13 @@ const Navbar = () => {
       (n) => formatTime(n.updatedAt || n.createdAt) !== null
     ) || [];
 
+  const unreadGroupNotifications = 
+    groupNotificationsData?.notifications?.filter(n => !n.read).length || 0;
+
   const notificationCount =
-    (friendRequests?.incomingReqs?.length || 0) + visibleAccepted.length;
+    (friendRequests?.incomingReqs?.length || 0) + 
+    visibleAccepted.length +
+    unreadGroupNotifications;
 
   // Logout
   const { mutate: logoutMutation } = useMutation({
@@ -132,10 +145,16 @@ const Navbar = () => {
               </button>
             </Link>
 
-            {/* Avatar - Desktop only */}
+           {/* Avatar - Desktop only */}
             <div className="avatar hidden lg:block">
               <div className="w-9 rounded-full">
-                <img src={authUser?.profilePic} alt="avatar" />
+                <img 
+                  src={authUser?.profilePic} 
+                  alt={authUser?.fullName || 'User'}
+                  onError={(e) => {
+                    e.target.src = getAvatarUrl(authUser?.fullName);
+                  }}
+                />
               </div>
             </div>
 

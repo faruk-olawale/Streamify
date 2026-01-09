@@ -154,3 +154,17 @@ export async function uploadGroupImage(file) {
   });
   return res.data;
 }
+
+// Get group notifications
+export async function getGroupNotifications() {
+  const res = await axiosInstance.get("/groups/notifications/all");
+  return res.data;
+}
+
+// Mark group notifications as read
+export async function markGroupNotificationsRead(notificationIds) {
+  const res = await axiosInstance.patch("/groups/notifications/read", {
+    notificationIds
+  });
+  return res.data;
+}

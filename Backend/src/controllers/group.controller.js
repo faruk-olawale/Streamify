@@ -1,4 +1,5 @@
 import Group from "../models/Group.model.js";
+import GroupNotification from "../models/GroupNotification.model.js";
 import { 
   createCustomGroupChannel, 
   addMembersToChannel, 
@@ -6,6 +7,7 @@ import {
   deleteChannel,
   updateChannelData
 } from "../lib/stream.js";
+
 
 // Create a new group
 export const createGroup = async (req, res) => {
@@ -35,11 +37,10 @@ export const createGroup = async (req, res) => {
       pendingRequests: []
     });
 
-      const populatedGroup = await Group.findById(group._id)
-      .populate("createdBy", "name email profilePicture") 
-      .populate("admins", "name email profilePicture")
-      .populate("members", "name email profilePicture")
-      .populate("pendingRequests.userId", "name email profilePicture");
+    const populatedGroup = await Group.findById(group._id)
+      .populate("createdBy", "fullName email profilePic")
+      .populate("admins", "fullName email profilePic")
+      .populate("members", "fullName email profilePic");
 
     res.status(201).json({ 
       message: "Group created successfully",
@@ -55,8 +56,8 @@ export const createGroup = async (req, res) => {
 export const getAllGroups = async (req, res) => {
   try {
     const groups = await Group.find({ isPublic: true })
-      .populate("createdBy", "name email profilePicture")
-      .populate("admins", "name email profilePicture")
+      .populate("createdBy", "fullName email profilePic")
+      .populate("admins", "fullName email profilePic")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ groups });
@@ -72,8 +73,8 @@ export const getUserGroups = async (req, res) => {
     const userId = req.user._id;
 
     const groups = await Group.find({ members: userId })
-      .populate("createdBy", "name email profilePicture")
-      .populate("admins", "name email profilePicture")
+      .populate("createdBy", "fullName email profilePic")
+      .populate("admins", "fullName email profilePic")
       .sort({ updatedAt: -1 });
 
     res.status(200).json({ groups });
@@ -90,10 +91,10 @@ export const getGroupDetails = async (req, res) => {
     const userId = req.user._id;
 
     const group = await Group.findById(groupId)
-      .populate("createdBy", "_id fullName email profilePic")
-      .populate("admins", "_id fullName email profilePic")
-      .populate("members", "_id fullName email profilePic")
-      .populate("pendingRequests.userId", "_id fullName email profilePic");
+      .populate("createdBy", "fullName email profilePic")
+      .populate("admins", "fullName email profilePic")
+      .populate("members", "fullName email profilePic")
+      .populate("pendingRequests.userId", "fullName email profilePic");
 
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
@@ -116,6 +117,56 @@ export const getGroupDetails = async (req, res) => {
   }
 };
 
+// Update group details (admin only)
+export const updateGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name, description, image } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Check if user is admin
+    if (!group.admins.some(admin => admin.toString() === userId.toString())) {
+      return res.status(403).json({ message: "Only admins can update group details" });
+    }
+
+    // Update fields
+    if (name) group.name = name.trim();
+    if (description !== undefined) group.description = description.trim();
+    if (image !== undefined) group.image = image.trim();
+
+    await group.save();
+
+    // Update Stream channel data
+    try {
+      await updateChannelData(group.streamChannelId, {
+        name: group.name,
+        image: group.image,
+      });
+    } catch (streamError) {
+      console.error("Error updating Stream channel:", streamError);
+    }
+
+    const populatedGroup = await Group.findById(group._id)
+      .populate("createdBy", "fullName email profilePic")
+      .populate("admins", "fullName email profilePic")
+      .populate("members", "fullName email profilePic");
+
+    res.status(200).json({ 
+      message: "Group updated successfully",
+      group: populatedGroup 
+    });
+  } catch (error) {
+    console.error("Error in updateGroup:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Request to join group
 export const requestJoinGroup = async (req, res) => {
   try {
@@ -134,9 +185,18 @@ export const requestJoinGroup = async (req, res) => {
     }
 
     // Check if already has pending request
-    const hasPendingRequest = group.pendingRequests.some(
-      req => req.userId.toString() === userId.toString()
-    );
+        const hadPendingRequest = group.pendingRequests.some(
+        req => req.userId.toString() === userId.toString()
+      );
+
+      if (!hadPendingRequest) {
+        return res.status(400).json({ message: "No pending join request for this user" });
+      }
+
+      group.pendingRequests = group.pendingRequests.filter(
+        req => req.userId.toString() !== userId.toString()
+      );
+
 
     if (hasPendingRequest) {
       return res.status(400).json({ message: "Request already pending" });
@@ -181,6 +241,14 @@ export const approveJoinRequest = async (req, res) => {
     }
 
     await group.save();
+
+    // Create notification for the user
+    await GroupNotification.create({
+      userId,
+      groupId,
+      type: "rejected",
+    });
+
 
     // Add to Stream channel
     try {
@@ -375,52 +443,41 @@ export const deleteGroup = async (req, res) => {
   }
 };
 
-// Update group details (admin only)
-export const updateGroup = async (req, res) => {
+// Get group notifications for a user
+export const getGroupNotifications = async (req, res) => {
   try {
-    const { groupId } = req.params;
-    const { name, description, image } = req.body;
     const userId = req.user._id;
 
-    const group = await Group.findById(groupId);
+    const notifications = await GroupNotification.find({ userId })
+      .populate("groupId", "name image")
+      .sort({ createdAt: -1 });
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
-    }
-
-    // Check if user is admin
-    if (!group.admins.some(admin => admin.toString() === userId.toString())) {
-      return res.status(403).json({ message: "Only admins can update group details" });
-    }
-
-    // Update fields
-    if (name) group.name = name.trim();
-    if (description !== undefined) group.description = description.trim();
-    if (image !== undefined) group.image = image.trim();
-
-    await group.save();
-
-    // Update Stream channel data
-    try {
-      await updateChannelData(group.streamChannelId, {
-        name: group.name,
-        image: group.image,
-      });
-    } catch (streamError) {
-      console.error("Error updating Stream channel:", streamError);
-    }
-
-    const populatedGroup = await Group.findById(group._id)
-      .populate("createdBy", "_id fullName email profilePic")
-      .populate("admins", "_id fullName email profilePic")
-      .populate("members", "_id fullName email profilePic");
-
-    res.status(200).json({ 
-      message: "Group updated successfully",
-      group: populatedGroup 
-    });
+    res.status(200).json({ notifications });
   } catch (error) {
-    console.error("Error in updateGroup:", error);
+    console.error("Error in getGroupNotifications:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Mark group notifications as read
+export const markGroupNotificationsRead = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { notificationIds } = req.body;
+
+    if (notificationIds && notificationIds.length > 0) {
+      await GroupNotification.updateMany(
+        { _id: { $in: notificationIds }, userId },
+        { read: true }
+      );
+    } else {
+      // Mark all as read
+      await GroupNotification.updateMany({ userId }, { read: true });
+    }
+
+    res.status(200).json({ message: "Notifications marked as read" });
+  } catch (error) {
+    console.error("Error in markGroupNotificationsRead:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
