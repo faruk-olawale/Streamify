@@ -154,3 +154,30 @@ export const getFriendRequests = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+// Mark friend notifications as read
+export const markFriendNotificationsRead = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { requestIds } = req.body;
+
+    if (requestIds && Array.isArray(requestIds) && requestIds.length > 0) {
+      // Mark specific requests as read
+      await FriendRequest.updateMany(
+        { _id: { $in: requestIds }, recipient: userId },
+        { read: true }
+      );
+    } else {
+      // Mark all accepted requests as read
+      await FriendRequest.updateMany(
+        { recipient: userId, status: 'accepted', read: false },
+        { read: true }
+      );
+    }
+
+    res.status(200).json({ message: "Notifications marked as read" });
+  } catch (error) {
+    console.error("Error marking friend notifications as read:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

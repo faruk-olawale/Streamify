@@ -14,13 +14,14 @@ import {
   leaveGroup,
   deleteGroup,
   getGroupNotifications,
-  markGroupNotificationsRead
+  markGroupNotificationsRead,
+  getUnreadNotificationCount
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
 
-// IMPORTANT: Specific routes BEFORE parameterized routes
 router.get("/notifications/all", protectRoute, getGroupNotifications);
+router.get("/notifications/unread-count", protectRoute, getUnreadNotificationCount);
 router.patch("/notifications/read", protectRoute, markGroupNotificationsRead);
 
 // Group management
@@ -40,5 +41,7 @@ router.post("/:groupId/reject/:userId", protectRoute, rejectJoinRequest);
 router.delete("/:groupId/members/:userId", protectRoute, removeMember);
 router.post("/:groupId/make-admin/:userId", protectRoute, makeAdmin);
 router.post("/:groupId/leave", protectRoute, leaveGroup);
+
+
 
 export default router;

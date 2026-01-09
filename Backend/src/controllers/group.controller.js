@@ -465,19 +465,39 @@ export const markGroupNotificationsRead = async (req, res) => {
     const userId = req.user._id;
     const { notificationIds } = req.body;
 
-    if (notificationIds && notificationIds.length > 0) {
+    if (notificationIds && Array.isArray(notificationIds) && notificationIds.length > 0) {
+      // Mark specific notifications as read
       await GroupNotification.updateMany(
         { _id: { $in: notificationIds }, userId },
         { read: true }
       );
+      console.log(`✓ Marked ${notificationIds.length} notifications as read`);
     } else {
-      // Mark all as read
-      await GroupNotification.updateMany({ userId }, { read: true });
+      // Mark all as read if no specific IDs provided
+      const result = await GroupNotification.updateMany({ userId, read: false }, { read: true });
+      console.log(`✓ Marked all ${result.modifiedCount} notifications as read`);
     }
 
     res.status(200).json({ message: "Notifications marked as read" });
   } catch (error) {
     console.error("Error in markGroupNotificationsRead:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get unread notification count
+export const getUnreadNotificationCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    const count = await GroupNotification.countDocuments({ 
+      userId, 
+      read: false 
+    });
+
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error("Error in getUnreadNotificationCount:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

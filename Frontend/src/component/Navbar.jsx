@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ShipWheelIcon,
-  BellIcon,
-  LogOutIcon,
-  UsersIcon,
-} from "lucide-react";
+import { ShipWheelIcon, BellIcon, LogOutIcon, UsersIcon } from "lucide-react";
 
 import useAuthUser from "../hooks/useAuthUser";
 import { logout, getFriendReqests, getGroupNotifications } from "../lib/api";
 import ThemeSelector from "./ThemeSelector";
 
-
-// --------- Helpers ----------
+// ---------- Helpers ----------
 function formatTime(timestamp) {
   if (!timestamp) return "Recently";
 
@@ -29,13 +23,25 @@ function formatTime(timestamp) {
   return null;
 }
 
-// --------- Component ----------
+// Fallback avatar generator
+function generateAvatarUrl(name) {
+  const initials = name
+    ? name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+    : "U";
+  return `https://ui-avatars.com/api/?name=${initials}&background=random`;
+}
+
+// ---------- Navbar Component ----------
 const Navbar = () => {
   const { authUser } = useAuthUser();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -44,39 +50,36 @@ const Navbar = () => {
   const isNotificationsPage = location.pathname === "/notifications";
   const isGroupsPage = location.pathname.startsWith("/groups");
 
-  // Fetch friend requests
+  // ---------- Queries ----------
   const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
   });
 
-  // Fetch group notifications
   const { data: groupNotificationsData } = useQuery({
     queryKey: ["groupNotifications"],
     queryFn: getGroupNotifications,
+    refetchInterval: 30000,
   });
 
-  const visibleAccepted =
-    friendRequests?.acceptedReqs?.filter(
-      (n) => formatTime(n.updatedAt || n.createdAt) !== null
-    ) || [];
+  const unreadGroupNotifications =
+    groupNotificationsData?.notifications?.filter((n) => !n.read).length || 0;
 
-  const unreadGroupNotifications = 
-    groupNotificationsData?.notifications?.filter(n => !n.read).length || 0;
+  const unreadFriendNotifications =
+    friendRequests?.acceptedReqs?.filter((n) => !n.read).length || 0;
 
   const notificationCount =
-    (friendRequests?.incomingReqs?.length || 0) + 
-    visibleAccepted.length +
+    (friendRequests?.incomingReqs?.length || 0) +
+    unreadFriendNotifications +
     unreadGroupNotifications;
 
-  // Logout
+  // ---------- Logout ----------
   const { mutate: logoutMutation } = useMutation({
     mutationFn: logout,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["authUser"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
   });
 
-  // Handle scroll behavior - hide on scroll down, show on scroll up
+  // ---------- Scroll behavior ----------
   useEffect(() => {
     if (!isHomePage) {
       setIsVisible(true);
@@ -87,13 +90,10 @@ const Navbar = () => {
       const currentScrollY = window.scrollY;
 
       if (currentScrollY < 10) {
-        // Always show at top
         setIsVisible(true);
       } else if (currentScrollY < lastScrollY) {
-        // Scrolling up - show navbar
         setIsVisible(true);
       } else if (currentScrollY > lastScrollY && currentScrollY > 80) {
-        // Scrolling down - hide navbar
         setIsVisible(false);
       }
 
@@ -101,13 +101,9 @@ const Navbar = () => {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY, isHomePage]);
 
-  // Don't show navbar on mobile for certain pages (they'll use bottom nav)
   const showOnMobile = isChatPage || isNotificationsPage || isGroupsPage;
 
   return (
@@ -118,7 +114,7 @@ const Navbar = () => {
     >
       <div className="container mx-auto h-full px-4 lg:px-8">
         <div className="flex h-full items-center">
-          {/* LEFT - Logo */}
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5">
             <ShipWheelIcon className="w-8 h-8 text-primary" />
             <span className="hidden sm:block text-2xl font-bold font-mono bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent tracking-wider">
@@ -126,14 +122,12 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* RIGHT - Actions */}
+          {/* Right actions */}
           <div className="ml-auto flex items-center gap-2 md:gap-3">
-            {/* Groups - Desktop only */}
             <Link to="/groups" className="hidden lg:flex btn btn-ghost btn-circle">
               <UsersIcon className="h-6 w-6 opacity-70" />
             </Link>
 
-            {/* Notifications */}
             <Link to="/notifications">
               <button className="btn btn-ghost btn-circle relative">
                 <BellIcon className="h-6 w-6 opacity-70" />
@@ -145,29 +139,23 @@ const Navbar = () => {
               </button>
             </Link>
 
-           {/* Avatar - Desktop only */}
+            {/* Avatar */}
             <div className="avatar hidden lg:block">
               <div className="w-9 rounded-full">
-                <img 
-                  src={authUser?.profilePic} 
-                  alt={authUser?.fullName || 'User'}
-                  onError={(e) => {
-                    e.target.src = getAvatarUrl(authUser?.fullName);
-                  }}
+                <img
+                  src={authUser?.profilePic || generateAvatarUrl(authUser?.fullName)}
+                  alt={authUser?.fullName || "User"}
                 />
               </div>
             </div>
 
-            {/* Theme Selector - Desktop only */}
+            {/* Theme Selector */}
             <div className="hidden lg:block">
               <ThemeSelector />
             </div>
 
             {/* Logout */}
-            <button
-              onClick={logoutMutation}
-              className="btn btn-ghost btn-circle"
-            >
+            <button onClick={logoutMutation} className="btn btn-ghost btn-circle">
               <LogOutIcon className="h-5 w-5 md:h-6 md:w-6 opacity-70" />
             </button>
           </div>

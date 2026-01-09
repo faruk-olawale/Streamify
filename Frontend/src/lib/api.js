@@ -168,3 +168,16 @@ export async function markGroupNotificationsRead(notificationIds) {
   });
   return res.data;
 }
+// Mark friend notifications as read
+export async function markFriendNotificationsRead(requestIds) {
+  const res = await axiosInstance.patch("/users/friend-notifications/read", {
+    requestIds
+  });
+  return res.data;
+}
+
+// Get unread group notification count
+export async function getUnreadGroupNotificationCount() {
+  const res = await axiosInstance.get("/groups/notifications/unread-count");
+  return res.data;
+}
