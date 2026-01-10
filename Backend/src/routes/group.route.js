@@ -15,7 +15,9 @@ import {
   deleteGroup,
   getGroupNotifications,
   markGroupNotificationsRead,
-  getUnreadNotificationCount
+  getUnreadNotificationCount,
+  addMemberDirectly,
+  getAvailableFriendsForGroup
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
@@ -23,6 +25,8 @@ const router = express.Router();
 router.get("/notifications/all", protectRoute, getGroupNotifications);
 router.get("/notifications/unread-count", protectRoute, getUnreadNotificationCount);
 router.patch("/notifications/read", protectRoute, markGroupNotificationsRead);
+router.post("/:groupId/add-member", protectRoute, addMemberDirectly);
+router.get("/:groupId/available-friends", protectRoute, getAvailableFriendsForGroup)
 
 // Group management
 router.post("/create", protectRoute, createGroup);

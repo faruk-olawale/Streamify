@@ -182,3 +182,15 @@ export async function getUnreadGroupNotificationCount() {
   const res = await axiosInstance.get("/groups/notifications/unread-count");
   return res.data;
 }
+
+// Add member directly to group (admin only)
+export async function addMemberDirectly(groupId, userId) {
+  const res = await axiosInstance.post(`/groups/${groupId}/add-member`, { userId });
+  return res.data;
+}
+
+// Get friends available to add to group
+export async function getAvailableFriendsForGroup(groupId) {
+  const res = await axiosInstance.get(`/groups/${groupId}/available-friends`);
+  return res.data;
+}

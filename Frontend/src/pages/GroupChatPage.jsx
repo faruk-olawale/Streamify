@@ -40,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import EditGroupModal from "../component/EditGroupModal";
+import AddMembersModal from "../component/AddMembersModal";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
@@ -48,6 +49,7 @@ const GroupChatPage = ({ authUser }) => {
   const [channel, setChannel] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const setupInProgress = useRef(false);
   const queryClient = useQueryClient();
 
@@ -362,7 +364,7 @@ const GroupChatPage = ({ authUser }) => {
                       <button
                         onClick={() => {
                           setShowEditModal(true);
-                          setShowSettings(false); // Close settings on mobile when opening edit
+                          setShowSettings(false);
                         }}
                         className="btn btn-ghost btn-xs gap-1"
                       >
@@ -402,6 +404,22 @@ const GroupChatPage = ({ authUser }) => {
                     <span className="truncate">Created by {group.createdBy?.fullName}</span>
                   </div>
                 </div>
+
+                {/* Add Members Button (Admin Only) */}
+                {userRole.isAdmin && (
+                  <div className="mb-6">
+                    <button
+                      onClick={() => {
+                        setShowAddMembersModal(true);
+                        setShowSettings(false);
+                      }}
+                      className="btn btn-primary btn-block gap-2"
+                    >
+                      <UserPlus size={18} />
+                      Add Members
+                    </button>
+                  </div>
+                )}
 
                 {/* Pending Requests (Admin Only) */}
                 {userRole.isAdmin && group.pendingRequests?.length > 0 && (
@@ -541,9 +559,7 @@ const GroupChatPage = ({ authUser }) => {
                   {!userRole.isCreator && (
                     <button
                       onClick={() => {
-                        if (
-                          confirm("Are you sure you want to leave this group?")
-                        ) {
+                        if (confirm("Are you sure you want to leave this group?")) {
                           leaveGroupMutation.mutate();
                         }
                       }}
@@ -585,6 +601,14 @@ const GroupChatPage = ({ authUser }) => {
         <EditGroupModal
           group={group}
           onClose={() => setShowEditModal(false)}
+        />
+      )}
+
+      {/* Add Members Modal */}
+      {showAddMembersModal && userRole.isAdmin && (
+        <AddMembersModal
+          group={group}
+          onClose={() => setShowAddMembersModal(false)}
         />
       )}
     </div>

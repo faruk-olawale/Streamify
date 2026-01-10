@@ -503,3 +503,138 @@ export const getUnreadNotificationCount = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Add member directly to group (admin only - must be friends)
+export const addMemberDirectly = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+    const adminId = req.user._id;
+
+    console.log("=== ADD MEMBER DIRECTLY ===");
+    console.log("Group ID:", groupId);
+    console.log("User ID to add:", userId);
+    console.log("Admin ID:", adminId);
+
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Check if user is admin
+    if (!group.admins.some(admin => admin.toString() === adminId.toString())) {
+      return res.status(403).json({ message: "Only admins can add members" });
+    }
+
+    // Check if user is already a member
+    if (group.members.some(member => member.toString() === userId)) {
+      return res.status(400).json({ message: "User is already a member" });
+    }
+
+    // Check if they are friends
+    const FriendRequest = (await import("../models/FriendRequest.js")).default;
+    const areFriends = await FriendRequest.findOne({
+      $or: [
+        { sender: adminId, recipient: userId, status: 'accepted' },
+        { sender: userId, recipient: adminId, status: 'accepted' }
+      ]
+    });
+
+    if (!areFriends) {
+      return res.status(400).json({ message: "You can only add friends to the group" });
+    }
+
+    // Add to members
+    group.members.push(userId);
+
+    // Remove from pending requests if they had one
+    group.pendingRequests = group.pendingRequests.filter(
+      req => req.userId.toString() !== userId
+    );
+
+    await group.save();
+    console.log("✓ User added to group members");
+
+    // Create notification for the user
+    try {
+      await GroupNotification.create({
+        userId,
+        groupId,
+        type: "approved",
+      });
+      console.log("✓ Notification created");
+    } catch (notifError) {
+      console.error("✗ Error creating notification:", notifError);
+    }
+
+    // Add to Stream channel
+    try {
+      await addMembersToChannel(group.streamChannelId, [userId]);
+      console.log("✓ User added to Stream channel");
+    } catch (streamError) {
+      console.error("✗ Error adding to Stream channel:", streamError);
+    }
+
+    res.status(200).json({ 
+      message: "Member added successfully",
+      group: await Group.findById(groupId)
+        .populate("members", "fullName email profilePic")
+    });
+  } catch (error) {
+    console.error("Error in addMemberDirectly:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get admin's friends who are not in the group
+export const getAvailableFriendsForGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const adminId = req.user._id;
+
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Check if user is admin
+    if (!group.admins.some(admin => admin.toString() === adminId.toString())) {
+      return res.status(403).json({ message: "Only admins can view this" });
+    }
+
+    // Get all friends
+    const FriendRequest = (await import("../models/FriendRequest.js")).default;
+    const User = (await import("../models/User.js")).default;
+
+    const friendRequests = await FriendRequest.find({
+      $or: [
+        { sender: adminId, status: 'accepted' },
+        { recipient: adminId, status: 'accepted' }
+      ]
+    });
+
+    // Get friend IDs
+    const friendIds = friendRequests.map(req => 
+      req.sender.toString() === adminId.toString() 
+        ? req.recipient 
+        : req.sender
+    );
+
+    // Filter out friends who are already members
+    const availableFriendIds = friendIds.filter(
+      friendId => !group.members.some(member => member.toString() === friendId.toString())
+    );
+
+    // Get friend details
+    const availableFriends = await User.find({
+      _id: { $in: availableFriendIds }
+    }).select("fullName email profilePic bio nativeLanguages learningLanguages");
+
+    res.status(200).json({ friends: availableFriends });
+  } catch (error) {
+    console.error("Error in getAvailableFriendsForGroup:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
