@@ -155,24 +155,48 @@ export const getFriendRequests = async (req, res) => {
   }
 };
 
+
+// ... existing functions
+
 // Mark friend notifications as read
 export const markFriendNotificationsRead = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { requestIds } = req.body;
+    const { requestIds, type } = req.body;
+
+    console.log("=== MARK FRIEND NOTIFICATIONS READ ===");
+    console.log("User ID:", userId);
+    console.log("Request IDs:", requestIds);
+    console.log("Type:", type);
 
     if (requestIds && Array.isArray(requestIds) && requestIds.length > 0) {
       // Mark specific requests as read
-      await FriendRequest.updateMany(
-        { _id: { $in: requestIds }, recipient: userId },
-        { read: true }
-      );
+      if (type === "accepted") {
+        // For accepted notifications (new connections)
+        await FriendRequest.updateMany(
+          { _id: { $in: requestIds }, status: 'accepted' },
+          { read: true }
+        );
+      } else {
+        // For incoming requests or any other
+        await FriendRequest.updateMany(
+          { _id: { $in: requestIds } },
+          { read: true }
+        );
+      }
+      console.log(`✓ Marked ${requestIds.length} friend notifications as read`);
     } else {
-      // Mark all accepted requests as read
-      await FriendRequest.updateMany(
-        { recipient: userId, status: 'accepted', read: false },
+      // Mark all unread notifications for this user
+      const result = await FriendRequest.updateMany(
+        { 
+          $or: [
+            { recipient: userId, read: false },
+            { sender: userId, status: 'accepted', read: false }
+          ]
+        },
         { read: true }
       );
+      console.log(`✓ Marked all ${result.modifiedCount} friend notifications as read`);
     }
 
     res.status(200).json({ message: "Notifications marked as read" });

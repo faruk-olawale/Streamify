@@ -47,6 +47,10 @@ function formatTime(timestamp) {
 
 function NotificationsPage() {
   const queryClient = useQueryClient();
+  const [markedAsRead, setMarkedAsRead] = useState({
+    group: false,
+    accepted: false,
+  });
   
   const { data: friendRequests, isLoading: loadingFriends } = useQuery({
     queryKey: ["friendRequests"],
@@ -74,7 +78,7 @@ function NotificationsPage() {
   });
 
   const { mutate: markFriendNotificationsReadMutation } = useMutation({
-    mutationFn: markFriendNotificationsRead,
+    mutationFn: ({ requestIds, type }) => markFriendNotificationsRead(requestIds, type),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
     },
@@ -104,32 +108,44 @@ function NotificationsPage() {
   }));
 
   const unreadGroupNotifications = formattedGroupNotifications.filter(n => !n.read);
-  const unreadFriendNotifications = visibleAccepted.filter(n => !n.read);
+  const unreadAcceptedRequests = visibleAccepted.filter(n => !n.read);
 
-  // Auto-mark notifications as read when page loads
+  // Auto-mark GROUP notifications as read when viewed
   useEffect(() => {
-    // Mark unread group notifications as read after 2 seconds
-    if (unreadGroupNotifications.length > 0) {
+    if (unreadGroupNotifications.length > 0 && !markedAsRead.group) {
       const timer = setTimeout(() => {
         const unreadIds = unreadGroupNotifications.map(n => n._id);
+        console.log("Auto-marking group notifications as read:", unreadIds);
         markGroupNotificationsReadMutation(unreadIds);
+        setMarkedAsRead(prev => ({ ...prev, group: true }));
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [groupNotifications.length]); // Only run when notifications change
+  }, [unreadGroupNotifications.length, markedAsRead.group]);
 
-  // Mark friend notifications as read
+  // Auto-mark ACCEPTED friend requests (new connections) as read when viewed
   useEffect(() => {
-    if (unreadFriendNotifications.length > 0) {
+    if (unreadAcceptedRequests.length > 0 && !markedAsRead.accepted) {
       const timer = setTimeout(() => {
-        const unreadIds = unreadFriendNotifications.map(n => n._id);
-        markFriendNotificationsReadMutation(unreadIds);
+        const unreadIds = unreadAcceptedRequests.map(n => n._id);
+        console.log("Auto-marking accepted friend requests as read:", unreadIds);
+        markFriendNotificationsReadMutation({ requestIds: unreadIds, type: 'accepted' });
+        setMarkedAsRead(prev => ({ ...prev, accepted: true }));
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [acceptedRequests.length]);
+  }, [unreadAcceptedRequests.length, markedAsRead.accepted]);
+
+  // Reset marked state when leaving page
+  useEffect(() => {
+    return () => {
+      setMarkedAsRead({ group: false, accepted: false });
+    };
+  }, []);
 
   const isLoading = loadingFriends || loadingGroups;
+
+  const totalUnread = unreadGroupNotifications.length + unreadAcceptedRequests.length;
 
   return (
     <div className="min-h-screen bg-base-100 px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
@@ -138,14 +154,14 @@ function NotificationsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Notifications
           </h1>
-          {(unreadGroupNotifications.length > 0 || unreadFriendNotifications.length > 0) && (
+          {totalUnread > 0 && (
             <button
               onClick={() => {
                 if (unreadGroupNotifications.length > 0) {
                   markGroupNotificationsReadMutation();
                 }
-                if (unreadFriendNotifications.length > 0) {
-                  markFriendNotificationsReadMutation();
+                if (unreadAcceptedRequests.length > 0) {
+                  markFriendNotificationsReadMutation({ type: 'accepted' });
                 }
               }}
               className="btn btn-ghost btn-sm gap-2"
@@ -162,6 +178,75 @@ function NotificationsPage() {
           </div>
         ) : (
           <>
+            {/* INCOMING FRIEND REQUESTS - These don't need "read" status, they disappear when accepted */}
+            {incomingRequests.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <UserCheckIcon className="h-5 w-5 text-primary" />
+                  Friend Requests
+                  <span className="badge badge-primary ml-2">
+                    {incomingRequests.length}
+                  </span>
+                </h2>
+
+                <div className="space-y-3">
+                  {incomingRequests.map((request) => (
+                    <div
+                      key={request._id}
+                      className="card bg-primary/10 border-2 border-primary/20 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="card-body p-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="avatar">
+                              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-base-300">
+                                <img
+                                  src={request.sender.profilePic}
+                                  alt={request.sender.fullName}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-sm md:text-base truncate">
+                                {request.sender.fullName}
+                              </h3>
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                {request.sender.nativeLanguages && (
+                                  <span className="badge badge-secondary badge-sm">
+                                    Native: {request.sender.nativeLanguages}
+                                  </span>
+                                )}
+                                {request.sender.learningLanguages && (
+                                  <span className="badge badge-outline badge-sm">
+                                    Learning: {request.sender.learningLanguages}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            className="btn btn-primary btn-sm flex-shrink-0"
+                            onClick={() => acceptRequestMutation(request._id)}
+                            disabled={acceptingFriend}
+                          >
+                            {acceptingFriend ? (
+                              <>
+                                <span className="loading loading-spinner loading-xs"></span>
+                                Accepting...
+                              </>
+                            ) : (
+                              "Accept"
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* GROUP NOTIFICATIONS */}
             {formattedGroupNotifications.length > 0 && (
               <section className="space-y-4">
@@ -186,7 +271,7 @@ function NotificationsPage() {
                     >
                       <div className="card-body p-4">
                         <div className="flex items-start gap-3">
-                          <div className="avatar">
+                          <div className="avatar flex-shrink-0">
                             <div className="w-10 h-10 rounded-lg">
                               <img
                                 src={notification.groupId.image}
@@ -216,86 +301,19 @@ function NotificationsPage() {
                             </p>
                           </div>
 
-                          {notification.type === "approved" && (
-                            <div className="badge badge-success badge-sm flex-shrink-0">
-                              Approved
-                            </div>
-                          )}
-                          {!notification.read && (
-                            <div className="w-2 h-2 rounded-full bg-info flex-shrink-0 mt-2"></div>
-                          )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {notification.type === "approved" && (
+                              <div className="badge badge-success badge-sm">
+                                Approved
+                              </div>
+                            )}
+                            {!notification.read && (
+                              <div className="w-2 h-2 rounded-full bg-info"></div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* INCOMING FRIEND REQUESTS */}
-            {incomingRequests.length > 0 && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <UserCheckIcon className="h-5 w-5 text-primary" />
-                  Friend Requests
-                  <span className="badge badge-primary ml-2">
-                    {incomingRequests.length}
-                  </span>
-                </h2>
-
-                <div className="space-y-3">
-                  {incomingRequests.map((request) => (
-                    <div
-                      key={request._id}
-                      className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <div className="card-body p-4">
-                        <div className="flex items-center justify-between flex-wrap gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="avatar">
-                              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-base-300">
-                                <img
-                                  src={request.sender.profilePic}
-                                  alt={request.sender.fullName}
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-sm md:text-base">
-                                {request.sender.fullName}
-                              </h3>
-                              <div className="flex flex-wrap gap-1.5 mt-1">
-                                {request.sender.nativeLanguages && (
-                                  <span className="badge badge-secondary badge-sm">
-                                    Native: {request.sender.nativeLanguages}
-                                  </span>
-                                )}
-                                {request.sender.learningLanguages && (
-                                  <span className="badge badge-outline badge-sm">
-                                    Learning: {request.sender.learningLanguages}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => acceptRequestMutation(request._id)}
-                            disabled={acceptingFriend}
-                          >
-                            {acceptingFriend ? (
-                              <>
-                                <span className="loading loading-spinner loading-xs"></span>
-                                Accepting...
-                              </>
-                            ) : (
-                              "Accept"
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
                   ))}
                 </div>
               </section>
@@ -307,9 +325,9 @@ function NotificationsPage() {
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <BellIcon className="h-5 w-5 text-success" />
                   New Connections
-                  {unreadFriendNotifications.length > 0 && (
+                  {unreadAcceptedRequests.length > 0 && (
                     <span className="badge badge-success ml-2">
-                      {unreadFriendNotifications.length}
+                      {unreadAcceptedRequests.length}
                     </span>
                   )}
                 </h2>
@@ -324,7 +342,7 @@ function NotificationsPage() {
                     >
                       <div className="card-body p-4">
                         <div className="flex items-start gap-3">
-                          <div className="avatar">
+                          <div className="avatar flex-shrink-0">
                             <div className="w-10 h-10 rounded-full">
                               <img
                                 src={notification.recipient.profilePic}
@@ -346,13 +364,15 @@ function NotificationsPage() {
                             </p>
                           </div>
 
-                          <div className="badge badge-success badge-sm flex-shrink-0">
-                            <MessagesSquareIcon className="h-3 w-3 mr-1" />
-                            New Friend
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="badge badge-success badge-sm">
+                              <MessagesSquareIcon className="h-3 w-3 mr-1" />
+                              New Friend
+                            </div>
+                            {!notification.read && (
+                              <div className="w-2 h-2 rounded-full bg-success"></div>
+                            )}
                           </div>
-                          {!notification.read && (
-                            <div className="w-2 h-2 rounded-full bg-success flex-shrink-0 mt-2"></div>
-                          )}
                         </div>
                       </div>
                     </div>

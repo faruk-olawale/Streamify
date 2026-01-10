@@ -169,9 +169,10 @@ export async function markGroupNotificationsRead(notificationIds) {
   return res.data;
 }
 // Mark friend notifications as read
-export async function markFriendNotificationsRead(requestIds) {
+export async function markFriendNotificationsRead(requestIds, type) {
   const res = await axiosInstance.patch("/users/friend-notifications/read", {
-    requestIds
+    requestIds,
+    type
   });
   return res.data;
 }

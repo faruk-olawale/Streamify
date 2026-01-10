@@ -185,18 +185,9 @@ export const requestJoinGroup = async (req, res) => {
     }
 
     // Check if already has pending request
-        const hadPendingRequest = group.pendingRequests.some(
-        req => req.userId.toString() === userId.toString()
-      );
-
-      if (!hadPendingRequest) {
-        return res.status(400).json({ message: "No pending join request for this user" });
-      }
-
-      group.pendingRequests = group.pendingRequests.filter(
-        req => req.userId.toString() !== userId.toString()
-      );
-
+    const hasPendingRequest = group.pendingRequests.some(
+      req => req.userId.toString() === userId.toString()
+    );
 
     if (hasPendingRequest) {
       return res.status(400).json({ message: "Request already pending" });
@@ -218,6 +209,11 @@ export const approveJoinRequest = async (req, res) => {
   try {
     const { groupId, userId } = req.params;
     const adminId = req.user._id;
+
+    console.log("=== APPROVE REQUEST ===");
+    console.log("Group ID:", groupId);
+    console.log("User ID:", userId);
+    console.log("Admin ID:", adminId);
 
     const group = await Group.findById(groupId);
 
@@ -241,20 +237,26 @@ export const approveJoinRequest = async (req, res) => {
     }
 
     await group.save();
+    console.log("✓ User added to group members");
 
     // Create notification for the user
-    await GroupNotification.create({
-      userId,
-      groupId,
-      type: "rejected",
-    });
-
+    try {
+      const notification = await GroupNotification.create({
+        userId,
+        groupId,
+        type: "approved",
+      });
+      console.log("✓ Notification created:", notification);
+    } catch (notifError) {
+      console.error("✗ Error creating notification:", notifError);
+    }
 
     // Add to Stream channel
     try {
       await addMembersToChannel(group.streamChannelId, [userId]);
+      console.log("✓ User added to Stream channel");
     } catch (streamError) {
-      console.error("Error adding to Stream channel:", streamError);
+      console.error("✗ Error adding to Stream channel:", streamError);
     }
 
     res.status(200).json({ message: "User approved and added to group" });

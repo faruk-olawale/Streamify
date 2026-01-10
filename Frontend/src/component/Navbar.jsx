@@ -7,34 +7,6 @@ import useAuthUser from "../hooks/useAuthUser";
 import { logout, getFriendReqests, getGroupNotifications } from "../lib/api";
 import ThemeSelector from "./ThemeSelector";
 
-// ---------- Helpers ----------
-function formatTime(timestamp) {
-  if (!timestamp) return "Recently";
-
-  const diffMs = Date.now() - new Date(timestamp).getTime();
-  const diffMin = Math.floor(diffMs / (1000 * 60));
-  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMin < 1) return "Recently";
-  if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffHrs < 24) return `${diffHrs} hr ago`;
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return null;
-}
-
-// Fallback avatar generator
-function generateAvatarUrl(name) {
-  const initials = name
-    ? name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : "U";
-  return `https://ui-avatars.com/api/?name=${initials}&background=random`;
-}
-
 // ---------- Navbar Component ----------
 const Navbar = () => {
   const { authUser } = useAuthUser();
@@ -51,26 +23,32 @@ const Navbar = () => {
   const isGroupsPage = location.pathname.startsWith("/groups");
 
   // ---------- Queries ----------
+  // Fetch friend requests
   const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendReqests,
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  // Fetch group notifications
   const { data: groupNotificationsData } = useQuery({
     queryKey: ["groupNotifications"],
     queryFn: getGroupNotifications,
-    refetchInterval: 30000,
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  // Count ONLY unread group notifications
   const unreadGroupNotifications =
     groupNotificationsData?.notifications?.filter((n) => !n.read).length || 0;
 
-  const unreadFriendNotifications =
+  // Count ONLY unread accepted friend requests (new connections)
+  const unreadAcceptedFriends =
     friendRequests?.acceptedReqs?.filter((n) => !n.read).length || 0;
 
+  // Total notification count: incoming requests + unread accepted + unread group
   const notificationCount =
     (friendRequests?.incomingReqs?.length || 0) +
-    unreadFriendNotifications +
+    unreadAcceptedFriends +
     unreadGroupNotifications;
 
   // ---------- Logout ----------
@@ -79,7 +57,7 @@ const Navbar = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
   });
 
-  // ---------- Scroll behavior ----------
+  // ---------- Scroll behavior (hide on scroll down, show on scroll up) ----------
   useEffect(() => {
     if (!isHomePage) {
       setIsVisible(true);
@@ -90,10 +68,13 @@ const Navbar = () => {
       const currentScrollY = window.scrollY;
 
       if (currentScrollY < 10) {
+        // Always show at top
         setIsVisible(true);
       } else if (currentScrollY < lastScrollY) {
+        // Scrolling up - show navbar
         setIsVisible(true);
       } else if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        // Scrolling down - hide navbar
         setIsVisible(false);
       }
 
@@ -124,10 +105,12 @@ const Navbar = () => {
 
           {/* Right actions */}
           <div className="ml-auto flex items-center gap-2 md:gap-3">
+            {/* Groups - Desktop only */}
             <Link to="/groups" className="hidden lg:flex btn btn-ghost btn-circle">
               <UsersIcon className="h-6 w-6 opacity-70" />
             </Link>
 
+            {/* Notifications */}
             <Link to="/notifications">
               <button className="btn btn-ghost btn-circle relative">
                 <BellIcon className="h-6 w-6 opacity-70" />
@@ -139,17 +122,22 @@ const Navbar = () => {
               </button>
             </Link>
 
-            {/* Avatar */}
+            {/* Avatar - Desktop only */}
             <div className="avatar hidden lg:block">
               <div className="w-9 rounded-full">
                 <img
-                  src={authUser?.profilePic || generateAvatarUrl(authUser?.fullName)}
+                  src={authUser?.profilePic}
                   alt={authUser?.fullName || "User"}
+                  onError={(e) => {
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      authUser?.fullName || "User"
+                    )}&background=random&size=128`;
+                  }}
                 />
               </div>
             </div>
 
-            {/* Theme Selector */}
+            {/* Theme Selector - Desktop only */}
             <div className="hidden lg:block">
               <ThemeSelector />
             </div>
