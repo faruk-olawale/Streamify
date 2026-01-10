@@ -24,15 +24,17 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: "",
     },
+    // FIXED: Changed from String to Array of Strings
     nativeLanguages: { 
-    type: String,
-    default: "English" },
-    
-    learningLanguages: {
-    type: String,
-    default: "", 
+        type: [String],  // Array of strings
+        default: []      // Empty array instead of "English"
     },
-
+    
+    // FIXED: Changed from String to Array of Strings
+    learningLanguages: {
+        type: [String],  // Array of strings
+        default: []      // Empty array
+    },
 
     location:{
         type: String,

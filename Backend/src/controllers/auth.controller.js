@@ -148,7 +148,7 @@ export async function logout(req, res) {
 }
 
 /**
- * Onboard user
+ * Onboard user - IMPROVED VERSION
  */
 export async function onboard(req, res) {
   const requestId = Math.random().toString(36).substring(7);
@@ -159,17 +159,60 @@ export async function onboard(req, res) {
     const userId = req.user._id;
 
     console.log(`[${requestId}] Request body:`, req.body);
+    console.log(`[${requestId}] Native Languages:`, nativeLanguages);
+    console.log(`[${requestId}] Learning Languages:`, learningLanguages);
+    console.log(`[${requestId}] Native Languages Type:`, typeof nativeLanguages);
+    console.log(`[${requestId}] Learning Languages Type:`, typeof learningLanguages);
+
+    // Validate that languages are provided
+    if (!nativeLanguages || (Array.isArray(nativeLanguages) && nativeLanguages.length === 0)) {
+      return res.status(400).json({ 
+        message: "Please select at least one native language" 
+      });
+    }
+
+    if (!learningLanguages || (Array.isArray(learningLanguages) && learningLanguages.length === 0)) {
+      return res.status(400).json({ 
+        message: "Please select at least one language you want to learn" 
+      });
+    }
 
     const updateData = { isOnboarded: true };
     if (fullName !== undefined) updateData.fullName = fullName;
     if (bio !== undefined) updateData.bio = bio;
     if (location !== undefined) updateData.location = location;
-    if (nativeLanguages !== undefined) updateData.nativeLanguages = nativeLanguages;
-    if (learningLanguages !== undefined) updateData.learningLanguages = learningLanguages;
+    
+    // Ensure languages are arrays
+    if (nativeLanguages !== undefined) {
+      updateData.nativeLanguages = Array.isArray(nativeLanguages) 
+        ? nativeLanguages 
+        : [nativeLanguages];
+    }
+    
+    if (learningLanguages !== undefined) {
+      updateData.learningLanguages = Array.isArray(learningLanguages) 
+        ? learningLanguages 
+        : [learningLanguages];
+    }
 
-    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true }).select("-password");
+    console.log(`[${requestId}] Update Data:`, JSON.stringify(updateData, null, 2));
 
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    const updatedUser = await User.findByIdAndUpdate(
+      userId, 
+      updateData, 
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log(`[${requestId}] Updated User:`, {
+      id: updatedUser._id,
+      nativeLanguages: updatedUser.nativeLanguages,
+      learningLanguages: updatedUser.learningLanguages,
+      isOnboarded: updatedUser.isOnboarded
+    });
 
     // Sync with Stream
     try {
@@ -178,6 +221,7 @@ export async function onboard(req, res) {
         name: updatedUser.fullName,
         image: updatedUser.profilePic || "",
       });
+      console.log(`[${requestId}] Stream sync successful`);
     } catch (streamError) {
       console.log(`[${requestId}] Error syncing Stream:`, streamError.message);
     }
@@ -187,6 +231,10 @@ export async function onboard(req, res) {
       user: updatedUser,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error(`[${requestId}] Error in onboard:`, error);
+    res.status(500).json({ 
+      message: "Internal Server Error",
+      error: error.message 
+    });
   }
 }

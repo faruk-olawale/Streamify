@@ -6,7 +6,6 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
   return (
     <div className="card bg-base-200 hover:shadow-md transition-shadow">
       <div className="card-body p-4">
-
         {/* USER INFO + LOCATION */}
         <div className="flex items-center gap-3 mb-3">
           <div className="avatar">
@@ -27,31 +26,41 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
           </div>
         </div>
 
-        {/* BIO - ONLY ADDITION */}
+        {/* BIO */}
         {friend.bio && (
           <p className="text-sm text-gray-600 mb-3 line-clamp-2">
             {friend.bio}
           </p>
         )}
 
-        {/* LANGUAGES */}
+        {/* LANGUAGES - FIXED: Handle arrays properly */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          <span className="badge badge-secondary text-xs">
-            {getLanguageFlag(friend.nativeLanguages)}
-            Native: {friend.nativeLanguages || ""}
-          </span>
+          {/* Native Languages */}
+          {friend.nativeLanguages && friend.nativeLanguages.length > 0 && (
+            <span className="badge badge-secondary text-xs flex items-center gap-1">
+              {getLanguageFlag(friend.nativeLanguages[0])}
+              Native: {friend.nativeLanguages.join(", ")}
+            </span>
+          )}
 
-          <span className="badge badge-outline text-xs">
-            {getLanguageFlag(friend.learningLanguages)}
-            Learning: {friend.learningLanguages || "N/A"}
-          </span>
+          {/* Learning Languages */}
+          {friend.learningLanguages && friend.learningLanguages.length > 0 ? (
+            <span className="badge badge-outline text-xs flex items-center gap-1">
+              {getLanguageFlag(friend.learningLanguages[0])}
+              Learning: {friend.learningLanguages.join(", ")}
+            </span>
+          ) : (
+            <span className="badge badge-outline text-xs opacity-50">
+              Learning: N/A
+            </span>
+          )}
         </div>
 
         {/* BUTTON - Show Message for friends, Send Request for others */}
         {isFriend ? (
           <Link 
             to={`/chat/${friend._id}`} 
-            className=" btn btn-outline text-xs"
+            className="btn btn-outline text-xs"
           >
             <MessageCircleIcon className="size-4 mr-2" />
             Message
@@ -82,10 +91,16 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
 
 export default FriendCard;
 
+// FIXED: Handle both string and array inputs
 export function getLanguageFlag(language) {
   if (!language) return null;
 
-  const langLower = language.toLowerCase();
+  // If it's an array, get the first element
+  const langToCheck = Array.isArray(language) ? language[0] : language;
+  
+  if (!langToCheck) return null;
+
+  const langLower = langToCheck.toLowerCase();
   const countryCode = LANGUAGE_TO_FLAG[langLower];
 
   if (!countryCode) return null;
