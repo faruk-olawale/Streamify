@@ -26,7 +26,7 @@ const GroupsPage = () => {
   const allGroups = allGroupsData?.groups || [];
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-h-screen bg-base-100 flex flex-col">
       {/* Header with Logo */}
       <div className="bg-base-200 border-b border-base-300 px-4 py-3 md:px-6 md:py-4">
         <div className="flex items-center justify-between">
