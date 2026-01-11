@@ -7,6 +7,8 @@ import {
   deleteChannel,
   updateChannelData
 } from "../lib/stream.js";
+import User from "../models/User.js";
+import { StreamChat } from "stream-chat";
 
 
 // Create a new group
@@ -510,8 +512,9 @@ export const getUnreadNotificationCount = async (req, res) => {
   }
 };
 
-// Add member directly to group (admin only - must be friends)
-
+/**
+ * Add member directly to group (admin only)
+ */
 export async function addMemberDirectly(req, res) {
   try {
     const { groupId } = req.params;
@@ -524,7 +527,7 @@ export async function addMemberDirectly(req, res) {
     }
 
     // Check if requester is admin or creator
-    const isAdmin = group.admins.includes(adminId) || group.creator.equals(adminId);
+    const isAdmin = group.admins.some(admin => admin.equals(adminId)) || group.creator.equals(adminId);
     if (!isAdmin) {
       return res.status(403).json({ message: "Only admins can add members directly" });
     }
@@ -536,7 +539,7 @@ export async function addMemberDirectly(req, res) {
     }
 
     // Check if user is already a member
-    if (group.members.includes(userId)) {
+    if (group.members.some(member => member.equals(userId))) {
       return res.status(400).json({ message: "User is already a member" });
     }
 
@@ -553,8 +556,12 @@ export async function addMemberDirectly(req, res) {
       read: false,
     });
 
-    // Add to Stream Chat channel
+    // Add to Stream Chat channel (if you're using Stream)
     try {
+      const streamClient = StreamChat.getInstance(
+        process.env.STREAM_API_KEY,
+        process.env.STREAM_API_SECRET
+      );
       const channel = streamClient.channel("messaging", groupId.toString());
       await channel.addMembers([userId.toString()]);
     } catch (streamError) {
@@ -572,54 +579,39 @@ export async function addMemberDirectly(req, res) {
   }
 }
 
-// Get admin's friends who are not in the group
-export const getAvailableFriendsForGroup = async (req, res) => {
+/**
+ * Get friends that can be added to group
+ */
+export async function getAvailableFriendsForGroup(req, res) {
   try {
     const { groupId } = req.params;
-    const adminId = req.user._id;
+    const userId = req.user._id;
 
+    // Get the group
     const group = await Group.findById(groupId);
-
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    // Check if user is admin
-    if (!group.admins.some(admin => admin.toString() === adminId.toString())) {
-      return res.status(403).json({ message: "Only admins can view this" });
+    // Get user's friends
+    const user = await User.findById(userId).populate("friends", "fullName profilePic bio nativeLanguages learningLanguages");
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Get all friends
-    const FriendRequest = (await import("../models/FriendRequest.js")).default;
-    const User = (await import("../models/User.js")).default;
-
-    const friendRequests = await FriendRequest.find({
-      $or: [
-        { sender: adminId, status: 'accepted' },
-        { recipient: adminId, status: 'accepted' }
-      ]
-    });
-
-    // Get friend IDs
-    const friendIds = friendRequests.map(req => 
-      req.sender.toString() === adminId.toString() 
-        ? req.recipient 
-        : req.sender
-    );
-
     // Filter out friends who are already members
-    const availableFriendIds = friendIds.filter(
-      friendId => !group.members.some(member => member.toString() === friendId.toString())
+    const availableFriends = user.friends.filter(
+      (friend) => !group.members.some((member) => member.equals(friend._id))
     );
 
-    // Get friend details
-    const availableFriends = await User.find({
-      _id: { $in: availableFriendIds }
-    }).select("fullName email profilePic bio nativeLanguages learningLanguages");
-
-    res.status(200).json({ friends: availableFriends });
+    res.status(200).json({
+      success: true,
+      friends: availableFriends,
+    });
   } catch (error) {
-    console.error("Error in getAvailableFriendsForGroup:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Error in getAvailableFriendsForGroup:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
-};
+}
+

@@ -11,15 +11,15 @@ const groupNotificationSchema = new mongoose.Schema({
     ref: "Group",
     required: true,
   },
-    type: {
-      type: String,
-      enum: ["approved", "rejected", "removed", "added_by_admin"], // Added new type
-      required: true,
-    },
-    addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
+  type: {
+    type: String,
+    enum: ["approved", "rejected", "removed", "added_by_admin"], // ADDED new type
+    required: true,
+  },
+  addedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
   read: {
     type: Boolean,
     default: false,

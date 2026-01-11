@@ -190,9 +190,10 @@ export async function addMemberDirectly(groupId, userId) {
 }
 
 // Get friends available to add to group
+
 export async function getAvailableFriendsForGroup(groupId) {
   const res = await axiosInstance.get(`/groups/${groupId}/available-friends`);
-  return res.data;
+  return res.data.friends || res.data || [];
 }
 
 export async function updateProfile(data) {

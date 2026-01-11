@@ -145,7 +145,7 @@ function NotificationsPage() {
   const totalUnread = unreadGroupNotifications.length + unreadAcceptedRequests.length;
 
   return (
-    <div className="min-h-screen bg-base-100 pb-24 sm:pb-6">
+    <div className="min-h-screen bg-base-100 sm:pb-6">
       {/* FIXED: Better responsive container with proper padding */}
       <div className="w-full max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         
