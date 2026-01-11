@@ -191,7 +191,11 @@ function NotificationsPage() {
                 </h2>
 
                 <div className="space-y-2 sm:space-y-3">
-                  {incomingRequests.map((request) => (
+                  {incomingRequests.map((request) => {
+                    // Safety check: Skip if sender is null/undefined
+                    if (!request.sender) return null;
+                    
+                    return (
                     <div
                       key={request._id}
                       className="card bg-primary/10 border-2 border-primary/20 shadow-sm hover:shadow-md transition-shadow"
@@ -202,8 +206,8 @@ function NotificationsPage() {
                           <div className="avatar flex-shrink-0">
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-base-300">
                               <img
-                                src={request.sender.profilePic}
-                                alt={request.sender.fullName}
+                                src={request.sender.profilePic || ''}
+                                alt={request.sender.fullName || 'User'}
                               />
                             </div>
                           </div>
@@ -211,7 +215,7 @@ function NotificationsPage() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm sm:text-base truncate">
-                              {request.sender.fullName}
+                              {request.sender.fullName || 'Unknown User'}
                             </h3>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {request.sender.nativeLanguages && request.sender.nativeLanguages.length > 0 && (
@@ -246,7 +250,7 @@ function NotificationsPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </section>
             )}
@@ -265,7 +269,11 @@ function NotificationsPage() {
                 </h2>
 
                 <div className="space-y-2 sm:space-y-3">
-                  {formattedGroupNotifications.map((notification) => (
+                  {formattedGroupNotifications.map((notification) => {
+                    // Safety check: Skip if groupId is null/undefined
+                    if (!notification.groupId) return null;
+                    
+                    return (
                     <Link
                       key={notification._id}
                       to={`/groups/${notification.groupId._id}`}
@@ -279,8 +287,8 @@ function NotificationsPage() {
                           <div className="avatar flex-shrink-0">
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg">
                               <img
-                                src={notification.groupId.image}
-                                alt={notification.groupId.name}
+                                src={notification.groupId.image || ''}
+                                alt={notification.groupId.name || 'Group'}
                               />
                             </div>
                           </div>
@@ -288,7 +296,7 @@ function NotificationsPage() {
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm sm:text-base truncate">
-                              {notification.groupId.name}
+                              {notification.groupId.name || 'Unknown Group'}
                             </h3>
                             <p className="text-xs sm:text-sm my-1 text-base-content/70">
                               {notification.type === "approved" && (
@@ -321,7 +329,7 @@ function NotificationsPage() {
                         </div>
                       </div>
                     </Link>
-                  ))}
+                  )})}
                 </div>
               </section>
             )}
@@ -340,7 +348,11 @@ function NotificationsPage() {
                 </h2>
 
                 <div className="space-y-2 sm:space-y-3">
-                  {visibleAccepted.map((notification) => (
+                  {visibleAccepted.map((notification) => {
+                    // Safety check: Skip if recipient is null/undefined
+                    if (!notification.recipient) return null;
+                    
+                    return (
                     <div
                       key={notification._id}
                       className={`card shadow-sm ${
@@ -353,8 +365,8 @@ function NotificationsPage() {
                           <div className="avatar flex-shrink-0">
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full">
                               <img
-                                src={notification.recipient.profilePic}
-                                alt={notification.recipient.fullName}
+                                src={notification.recipient.profilePic || ''}
+                                alt={notification.recipient.fullName || 'User'}
                               />
                             </div>
                           </div>
@@ -362,10 +374,10 @@ function NotificationsPage() {
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm sm:text-base truncate">
-                              {notification.recipient.fullName}
+                              {notification.recipient.fullName || 'Unknown User'}
                             </h3>
                             <p className="text-xs sm:text-sm my-1 text-base-content/70">
-                              You are now friends with {notification.recipient.fullName}
+                              You are now friends with {notification.recipient.fullName || 'this user'}
                             </p>
                             <p className="text-xs flex items-center text-base-content/60">
                               <ClockIcon className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -386,7 +398,7 @@ function NotificationsPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </section>
             )}

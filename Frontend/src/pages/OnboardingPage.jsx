@@ -7,6 +7,8 @@ import { CameraIcon, LoaderIcon } from "lucide-react";
 import { ShuffleIcon } from "lucide-react";
 import { LANGUAGES } from "../constants";
 import { MapPinIcon, ShipWheelIcon } from "lucide-react";
+import { generateRandomAvatar } from "../utils/avatar-helper";
+import Avatar from "../component/Avatar";
 
 const OnboardingPage = () => {
   const queryClient = useQueryClient();
@@ -60,9 +62,7 @@ const OnboardingPage = () => {
   };
 
   const handleRounderAvater = () => {
-    const idx = Math.floor(Math.random() * 100) + 1;
-    const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
-
+    const randomAvatar = generateRandomAvatar(formState.fullName || 'User', 'ui-avatars');
     setFormState({ ...formState, profilePic: randomAvatar });
     toast.success("Random profile picture generated");
   };
@@ -77,19 +77,12 @@ const OnboardingPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="size-32 rounded-full bg-base-300 overflow-hidden">
-                {formState.profilePic ? (
-                  <img
-                    src={formState.profilePic}
-                    alt="Profile Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <CameraIcon className="size-12 text-base-content opacity-40" />
-                  </div>
-                )}
-              </div>
+              <Avatar 
+                src={formState.profilePic}
+                alt={formState.fullName}
+                size="2xl"
+                showRing={false}
+              />
 
               <div className="flex items-center gap-2">
                 <button

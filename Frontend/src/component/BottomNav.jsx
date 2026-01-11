@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { Home, Users, MessageCircle, UserCircle } from "lucide-react";
 import useAuthUser from "../hooks/useAuthUser";
+import Avatar from "./Avatar";
 
 const BottomNav = () => {
   const location = useLocation();
@@ -53,7 +54,7 @@ const BottomNav = () => {
             <Users size={24} className={isActive("/groups") ? "fill-current" : ""} />
           </Link>
 
-          {/* Profile */}
+          {/* Profile - UPDATED WITH AVATAR COMPONENT */}
           <Link
             to="/profile"
             className={`flex flex-col items-center justify-center w-16 h-12 rounded-lg transition-colors ${
@@ -61,14 +62,13 @@ const BottomNav = () => {
             }`}
           >
             {authUser?.profilePic ? (
-              <div
-                className={`avatar ${
-                  isActive("/profile") ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100" : ""
-                }`}
-              >
-                <div className="w-7 h-7 rounded-full">
-                  <img src={authUser.profilePic} alt="Profile" />
-                </div>
+              <div className={isActive("/profile") ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 rounded-full" : ""}>
+                <Avatar 
+                  src={authUser.profilePic} 
+                  alt={authUser.fullName || 'Profile'}
+                  size="xs"
+                  showRing={false}
+                />
               </div>
             ) : (
               <UserCircle size={24} className={isActive("/profile") ? "fill-current" : ""} />

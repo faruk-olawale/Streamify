@@ -196,19 +196,6 @@ export async function getAvailableFriendsForGroup(groupId) {
 }
 
 export async function updateProfile(data) {
-  const res = await fetch("/api/user/update-profile", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || "Failed to update profile");
-  }
-
-  return res.json();
+  const res = await axiosInstance.put("/users/update-profile", data);
+  return res.data;
 }

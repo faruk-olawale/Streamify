@@ -7,23 +7,27 @@ import {
   getFriendRequests,
   getRecommendedUsers,
   getOutgoingFriendRequests,
-  markFriendNotificationsRead
+  markFriendNotificationsRead,
+  updateProfile
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
+// Apply protection to all routes
 router.use(protectRoute);
 
-router.get("/", getRecommendedUsers);                 // recommended users
-router.get("/friends", getMyFriends);                // user's friends
+// User routes
+router.get("/", getRecommendedUsers);               
+router.get("/friends", getMyFriends);                
 router.get("/outgoing-friend-requests", getOutgoingFriendRequests);
+router.get("/friend-requests", getFriendRequests);
 
+// Friend request actions
 router.post("/friend-requests/:id", sendFriendRequest);
 router.put("/friend-requests/:id/accept", acceptFriendRequest);
+router.patch("/friend-notifications/read", markFriendNotificationsRead);
 
-router.get("/friend-requests", getFriendRequests);  // incoming requests
-
-// Add this route
-router.patch("/friend-notifications/read", protectRoute, markFriendNotificationsRead);
+// Profile update - REMOVE the duplicate protectRoute
+router.put("/update-profile", updateProfile);
 
 export default router;

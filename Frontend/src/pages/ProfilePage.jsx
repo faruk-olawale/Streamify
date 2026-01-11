@@ -8,6 +8,8 @@ import ThemeSelector from "../component/ThemeSelector";
 import { LANGUAGES } from "../constants";
 import toast from "react-hot-toast";
 import { updateProfile } from "../lib/api"; // You'll need to create this
+import { generateRandomAvatar } from "../utils/avatar-helper";
+import Avatar from "../component/Avatar";
 
 const ProfilePage = () => {
   const { authUser } = useAuthUser();
@@ -24,7 +26,7 @@ const ProfilePage = () => {
   });
 
   return (
-    <div className="bg-base-100 pt-0 flex flex-col pb-28">
+    <div className="bg-base-100 pt-0 flex flex-col">
       {/* Header */}
       <div className="bg-base-200 p-6 text-center flex-shrink-0 relative">
         {/* Edit Button */}
@@ -36,11 +38,13 @@ const ProfilePage = () => {
           <Edit size={16} />
         </button>
 
-        <div className="avatar mb-4">
-          <div className="w-24 h-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-            <img src={authUser?.profilePic} alt={authUser?.fullName} />
-          </div>
-        </div>
+        <Avatar 
+          src={authUser?.profilePic}
+          alt={authUser?.fullName}
+          size="xl"
+          showRing={true}
+          className="mb-4"
+        />
         <h2 className="text-2xl font-bold">{authUser?.fullName}</h2>
         <p className="text-base-content/60">{authUser?.email}</p>
       </div>
@@ -179,8 +183,7 @@ function EditProfileModal({ authUser, onClose, queryClient }) {
   };
 
   const handleGenerateAvatar = () => {
-    const idx = Math.floor(Math.random() * 100) + 1;
-    const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
+    const randomAvatar = generateRandomAvatar(formData.fullName || 'User', 'ui-avatars');
     setFormData({ ...formData, profilePic: randomAvatar });
     toast.success("Random avatar generated!");
   };
@@ -193,17 +196,12 @@ function EditProfileModal({ authUser, onClose, queryClient }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Profile Picture */}
           <div className="flex flex-col items-center space-y-3">
-            <div className="avatar">
-              <div className="w-24 h-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                {formData.profilePic ? (
-                  <img src={formData.profilePic} alt="Profile" />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-base-300">
-                    <Camera size={32} className="opacity-40" />
-                  </div>
-                )}
-              </div>
-            </div>
+            <Avatar 
+                src={formData.profilePic}
+                alt={formData.fullName}
+                size="xl"
+                showRing={true}
+              />
             <button
               type="button"
               onClick={handleGenerateAvatar}

@@ -1,6 +1,8 @@
 import { CheckCircleIcon, UserPlusIcon, MapPinIcon, MessageCircleIcon } from "lucide-react";
 import { LANGUAGE_TO_FLAG } from "../constants";
 import { Link } from "react-router";
+import Avatar from "./Avatar";
+
 
 const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) => {
   return (
@@ -8,11 +10,12 @@ const FriendCard = ({ friend, sendRequest, isRequestSent, isFriend = false }) =>
       <div className="card-body p-4">
         {/* USER INFO + LOCATION */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="avatar">
-            <div className="w-12 h-12 rounded-full">
-              <img src={friend.profilePic} alt={friend.fullName} />
-            </div>
-          </div>
+          <Avatar 
+              src={friend.profilePic}
+              alt={friend.fullName}
+              size="md"
+              showRing={false}
+            />
 
           <div className="flex flex-col">
             <h3 className="font-semibold truncate">{friend.fullName}</h3>

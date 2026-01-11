@@ -10,14 +10,12 @@ import chatRoutes from "./routes/chat.route.js";
 import groupRoutes from "./routes/group.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 
-
 import { connectDB } from "./lib/db.js";
-
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT
+const PORT = process.env.PORT;
 
 const __dirname = path.resolve();
 
@@ -26,13 +24,14 @@ app.use(cookieParser());
 app.use(cors({
     origin:"http://localhost:5173",
     credentials:true
-}))
+}));
 
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes);  // Keep only this one
 app.use("/api/chat", chatRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/upload", uploadRoutes);
+// REMOVE THIS LINE: app.use("/api/user", userRoutes);
 
 // Log all registered routes
 console.log("=== REGISTERED ROUTES ===");
@@ -42,18 +41,15 @@ app._router.stack.forEach((middleware) => {
   }
 });
 
-
-
 if (process.env.NODE_ENV === "production") {
     app.use(express.static(path.join(__dirname, "../Frontend/dist")));
 
     app.get("*", (req,res) => {
         res.sendFile(path.join(__dirname, "../Frontend", "dist", "index.html"));
-    })
+    });
 }
 
 app.listen(PORT, () => {
     console.log(`server is running on port ${PORT}`);
     connectDB();
-    
-})
+});

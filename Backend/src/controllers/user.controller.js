@@ -1,5 +1,7 @@
 import FriendRequest from "../models/FriendRequest.js";
 import User from "../models/User.js";
+import { upsertStreamUser } from "../lib/stream.js";
+
 
 /**
  * Get recommended users (exclude self and friends)
@@ -205,3 +207,57 @@ export const markFriendNotificationsRead = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+/**
+ * Update user profile
+ */
+export async function updateProfile(req, res) {
+  try {
+    const userId = req.user._id;
+    const { fullName, bio, location, profilePic, nativeLanguages, learningLanguages } = req.body;
+
+    // Build update object with only provided fields
+    const updateData = {};
+    if (fullName !== undefined) updateData.fullName = fullName;
+    if (bio !== undefined) updateData.bio = bio;
+    if (location !== undefined) updateData.location = location;
+    if (profilePic !== undefined) updateData.profilePic = profilePic;
+    if (nativeLanguages !== undefined) updateData.nativeLanguages = nativeLanguages;
+    if (learningLanguages !== undefined) updateData.learningLanguages = learningLanguages;
+
+    // Update user in database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Sync with Stream if name or profile pic changed
+    if (fullName !== undefined || profilePic !== undefined) {
+      try {
+        await upsertStreamUser({
+          id: updatedUser._id.toString(),
+          name: updatedUser.fullName,
+          image: updatedUser.profilePic || "",
+        });
+        console.log("Stream user updated successfully");
+      } catch (streamError) {
+        console.log("Error syncing with Stream:", streamError.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      user: updatedUser,
+      message: "Profile updated successfully",
+    });
+  } catch (error) {
+    console.log("Error in updateProfile controller:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
