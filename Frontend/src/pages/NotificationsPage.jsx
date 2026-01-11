@@ -145,7 +145,7 @@ function NotificationsPage() {
   const totalUnread = unreadGroupNotifications.length + unreadAcceptedRequests.length;
 
   return (
-    <div className="min-h-screen bg-base-100  sm:pb-6">
+    <div className="min-h-screen bg-base-100 pb-24 sm:pb-6">
       {/* FIXED: Better responsive container with proper padding */}
       <div className="w-full max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         
@@ -308,6 +308,14 @@ function NotificationsPage() {
                               {notification.type === "removed" && (
                                 <>You were removed from the group.</>
                               )}
+                              {notification.type === "added_by_admin" && (
+                                <>
+                                  ✨ You've been added to this group
+                                  {notification.addedBy && (
+                                    <> by <span className="font-semibold">{notification.addedBy.fullName}</span></>
+                                  )}! Start chatting with the group.
+                                </>
+                              )}
                             </p>
                             <p className="text-xs flex items-center text-base-content/60">
                               <ClockIcon className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -320,6 +328,11 @@ function NotificationsPage() {
                             {notification.type === "approved" && (
                               <div className="badge badge-success badge-xs sm:badge-sm whitespace-nowrap">
                                 Approved
+                              </div>
+                            )}
+                            {notification.type === "added_by_admin" && (
+                              <div className="badge badge-info badge-xs sm:badge-sm whitespace-nowrap">
+                                Added
                               </div>
                             )}
                             {!notification.read && (

@@ -4,22 +4,26 @@ const groupNotificationSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true
+    required: true,
   },
   groupId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Group",
-    required: true
+    required: true,
   },
-  type: {
-    type: String,
-    enum: ["approved", "rejected", "removed"],
-    required: true
-  },
+    type: {
+      type: String,
+      enum: ["approved", "rejected", "removed", "added_by_admin"], // Added new type
+      required: true,
+    },
+    addedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   read: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 }, { timestamps: true });
 
 const GroupNotification = mongoose.model("GroupNotification", groupNotificationSchema);

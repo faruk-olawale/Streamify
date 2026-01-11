@@ -446,20 +446,26 @@ export const deleteGroup = async (req, res) => {
 };
 
 // Get group notifications for a user
-export const getGroupNotifications = async (req, res) => {
+
+export async function getGroupNotifications(req, res) {
   try {
     const userId = req.user._id;
 
     const notifications = await GroupNotification.find({ userId })
       .populate("groupId", "name image")
-      .sort({ createdAt: -1 });
+      .populate("addedBy", "fullName profilePic") // ADDED this
+      .sort({ createdAt: -1 })
+      .limit(50);
 
-    res.status(200).json({ notifications });
+    res.status(200).json({
+      success: true,
+      notifications,
+    });
   } catch (error) {
-    console.error("Error in getGroupNotifications:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Error in getGroupNotifications:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
-};
+}
 
 // Mark group notifications as read
 export const markGroupNotificationsRead = async (req, res) => {
@@ -505,87 +511,66 @@ export const getUnreadNotificationCount = async (req, res) => {
 };
 
 // Add member directly to group (admin only - must be friends)
-export const addMemberDirectly = async (req, res) => {
+
+export async function addMemberDirectly(req, res) {
   try {
     const { groupId } = req.params;
     const { userId } = req.body;
     const adminId = req.user._id;
 
-    console.log("=== ADD MEMBER DIRECTLY ===");
-    console.log("Group ID:", groupId);
-    console.log("User ID to add:", userId);
-    console.log("Admin ID:", adminId);
-
     const group = await Group.findById(groupId);
-
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    // Check if user is admin
-    if (!group.admins.some(admin => admin.toString() === adminId.toString())) {
-      return res.status(403).json({ message: "Only admins can add members" });
+    // Check if requester is admin or creator
+    const isAdmin = group.admins.includes(adminId) || group.creator.equals(adminId);
+    if (!isAdmin) {
+      return res.status(403).json({ message: "Only admins can add members directly" });
+    }
+
+    // Check if user exists
+    const userToAdd = await User.findById(userId);
+    if (!userToAdd) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Check if user is already a member
-    if (group.members.some(member => member.toString() === userId)) {
+    if (group.members.includes(userId)) {
       return res.status(400).json({ message: "User is already a member" });
     }
 
-    // Check if they are friends
-    const FriendRequest = (await import("../models/FriendRequest.js")).default;
-    const areFriends = await FriendRequest.findOne({
-      $or: [
-        { sender: adminId, recipient: userId, status: 'accepted' },
-        { sender: userId, recipient: adminId, status: 'accepted' }
-      ]
+    // Add user to group
+    group.members.push(userId);
+    await group.save();
+
+    // Create notification for the added user
+    await GroupNotification.create({
+      userId: userId,
+      groupId: groupId,
+      type: "added_by_admin",
+      addedBy: adminId,
+      read: false,
     });
 
-    if (!areFriends) {
-      return res.status(400).json({ message: "You can only add friends to the group" });
-    }
-
-    // Add to members
-    group.members.push(userId);
-
-    // Remove from pending requests if they had one
-    group.pendingRequests = group.pendingRequests.filter(
-      req => req.userId.toString() !== userId
-    );
-
-    await group.save();
-    console.log("✓ User added to group members");
-
-    // Create notification for the user
+    // Add to Stream Chat channel
     try {
-      await GroupNotification.create({
-        userId,
-        groupId,
-        type: "approved",
-      });
-      console.log("✓ Notification created");
-    } catch (notifError) {
-      console.error("✗ Error creating notification:", notifError);
-    }
-
-    // Add to Stream channel
-    try {
-      await addMembersToChannel(group.streamChannelId, [userId]);
-      console.log("✓ User added to Stream channel");
+      const channel = streamClient.channel("messaging", groupId.toString());
+      await channel.addMembers([userId.toString()]);
     } catch (streamError) {
-      console.error("✗ Error adding to Stream channel:", streamError);
+      console.log("Error adding member to Stream:", streamError.message);
     }
 
-    res.status(200).json({ 
+    res.status(200).json({
+      success: true,
       message: "Member added successfully",
-      group: await Group.findById(groupId)
-        .populate("members", "fullName email profilePic")
+      group: await group.populate("members", "fullName profilePic"),
     });
   } catch (error) {
-    console.error("Error in addMemberDirectly:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log("Error in addMemberDirectly:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
-};
+}
 
 // Get admin's friends who are not in the group
 export const getAvailableFriendsForGroup = async (req, res) => {

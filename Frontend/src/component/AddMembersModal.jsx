@@ -1,152 +1,196 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAvailableFriendsForGroup, addMemberDirectly } from "../lib/api";
+import { X, UserPlus, Loader } from "lucide-react";
 import toast from "react-hot-toast";
-import { X, UserPlus, Search } from "lucide-react";
+import Avatar from "./Avatar";
 
-const AddMembersModal = ({ group, onClose }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const AddMembersModal = ({ group, groupId: propGroupId, onClose }) => {
+  // Support both props: group object or groupId string
+  const groupId = propGroupId || group?._id;
+  
   const queryClient = useQueryClient();
+  const [selectedFriends, setSelectedFriends] = useState(new Set());
 
-  const { data: friendsData, isLoading } = useQuery({
-    queryKey: ["available-friends", group._id],
-    queryFn: () => getAvailableFriendsForGroup(group._id),
+  const { data: availableFriends = [], isLoading } = useQuery({
+    queryKey: ["availableFriends", groupId],
+    queryFn: () => getAvailableFriendsForGroup(groupId),
+    enabled: !!groupId,
   });
 
-  const addMemberMutation = useMutation({
-    mutationFn: (userId) => addMemberDirectly(group._id, userId),
+  const { mutate: addMemberMutation, isPending } = useMutation({
+    mutationFn: ({ groupId, userId }) => addMemberDirectly(groupId, userId),
     onSuccess: () => {
-      toast.success("Member added successfully!");
-      queryClient.invalidateQueries(["group", group._id]);
-      queryClient.invalidateQueries(["available-friends", group._id]);
+      queryClient.invalidateQueries({ queryKey: ["groupDetails", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["group", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["availableFriends", groupId] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to add member");
     },
   });
 
-  const friends = friendsData?.friends || [];
+  const handleToggleFriend = (friendId) => {
+    const newSelected = new Set(selectedFriends);
+    if (newSelected.has(friendId)) {
+      newSelected.delete(friendId);
+    } else {
+      newSelected.add(friendId);
+    }
+    setSelectedFriends(newSelected);
+  };
 
-  const filteredFriends = friends.filter((friend) =>
-    friend.fullName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleAddSelected = async () => {
+    if (selectedFriends.size === 0) {
+      toast.error("Please select at least one friend");
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Add each selected friend
+    for (const userId of selectedFriends) {
+      try {
+        await new Promise((resolve, reject) => {
+          addMemberMutation(
+            { groupId, userId },
+            {
+              onSuccess: () => {
+                successCount++;
+                resolve();
+              },
+              onError: () => {
+                errorCount++;
+                reject();
+              },
+            }
+          );
+        });
+      } catch (error) {
+        // Error already counted
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully added ${successCount} member(s)!`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Failed to add ${errorCount} member(s)`);
+    }
+
+    setSelectedFriends(new Set());
+    onClose();
+  };
+
+  if (!groupId) {
+    return null;
+  }
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-md">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg">Add Members</h3>
-          <button
-            onClick={onClose}
-            className="btn btn-sm btn-circle btn-ghost"
-            disabled={addMemberMutation.isPending}
-          >
+      <div className="modal-box max-w-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-xl md:text-2xl">Add Friends to Group</h3>
+          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">
             <X size={20} />
           </button>
         </div>
 
-       {/* Search */}
-        <div className="mb-4">
-        <div className="relative">
-            {/* Icon inside input */}
-            <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50"
-            />
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader className="animate-spin" size={32} />
+          </div>
+        ) : availableFriends.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-base-content/70">
+              All your friends are already members of this group!
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-base-content/70 mb-4">
+              Select friends to add to the group. They'll receive a notification.
+            </p>
 
-            <input
-            type="text"
-            placeholder="Search friends..."
-            className="input input-bordered w-full pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            />
-        </div>
-        </div>
-
-
-        {/* Friends List */}
-        <div className="max-h-96 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg"></span>
-            </div>
-          ) : filteredFriends.length === 0 ? (
-            <div className="text-center py-12">
-              <UserPlus size={48} className="mx-auto text-base-content/30 mb-4" />
-              <p className="text-base-content/60">
-                {searchQuery
-                  ? "No friends found matching your search"
-                  : friends.length === 0
-                  ? "All your friends are already in this group!"
-                  : "No friends available to add"}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredFriends.map((friend) => (
+            <div className="max-h-96 overflow-y-auto space-y-2 mb-4">
+              {availableFriends.map((friend) => (
                 <div
                   key={friend._id}
-                  className="flex items-center justify-between p-3 bg-base-200 rounded-lg hover:bg-base-300 transition-colors"
+                  className={`card cursor-pointer transition-all ${
+                    selectedFriends.has(friend._id)
+                      ? "bg-primary/10 border-2 border-primary"
+                      : "bg-base-200 hover:bg-base-300"
+                  }`}
+                  onClick={() => handleToggleFriend(friend._id)}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="avatar">
-                      <div className="w-10 h-10 rounded-full">
-                        <img
-                          src={friend.profilePic}
-                          alt={friend.fullName}
-                          onError={(e) => {
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              friend.fullName
-                            )}&background=random`;
-                          }}
-                        />
-                      </div>
-                    </div>
+                  <div className="card-body p-3 flex flex-row items-center gap-3">
+                    <Avatar
+                      src={friend.profilePic}
+                      alt={friend.fullName}
+                      size="md"
+                      showRing={false}
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{friend.fullName}</p>
+                      <h4 className="font-semibold truncate">{friend.fullName}</h4>
                       {friend.bio && (
-                        <p className="text-xs text-base-content/60 truncate">
+                        <p className="text-sm text-base-content/70 truncate">
                           {friend.bio}
                         </p>
                       )}
-                      <div className="flex gap-1 mt-1">
-                        {friend.nativeLanguages && (
-                          <span className="badge badge-secondary badge-xs">
-                            {friend.nativeLanguages}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {friend.nativeLanguages && friend.nativeLanguages.length > 0 && (
+                          <span className="badge badge-xs badge-secondary">
+                            {Array.isArray(friend.nativeLanguages)
+                              ? friend.nativeLanguages[0]
+                              : friend.nativeLanguages}
                           </span>
                         )}
-                        {friend.learningLanguages && (
-                          <span className="badge badge-outline badge-xs">
-                            {friend.learningLanguages}
+                        {friend.learningLanguages && friend.learningLanguages.length > 0 && (
+                          <span className="badge badge-xs badge-outline">
+                            Learning: {Array.isArray(friend.learningLanguages)
+                              ? friend.learningLanguages[0]
+                              : friend.learningLanguages}
                           </span>
                         )}
                       </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => addMemberMutation.mutate(friend._id)}
-                    className="btn btn-primary btn-sm gap-1"
-                    disabled={addMemberMutation.isPending}
-                  >
-                    {addMemberMutation.isPending ? (
-                      <>
-                        <span className="loading loading-spinner loading-xs"></span>
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus size={16} />
-                        Add
-                      </>
+                    {selectedFriends.has(friend._id) && (
+                      <div className="badge badge-primary">✓</div>
                     )}
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="btn btn-ghost flex-1"
+                disabled={isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSelected}
+                className="btn btn-primary flex-1"
+                disabled={isPending || selectedFriends.size === 0}
+              >
+                {isPending ? (
+                  <>
+                    <Loader className="animate-spin" size={16} />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} />
+                    Add {selectedFriends.size > 0 ? `(${selectedFriends.size})` : "Friends"}
+                  </>
+                )}
+              </button>
+            </div>
+          </>
+        )}
       </div>
       <div className="modal-backdrop" onClick={onClose}></div>
     </div>
