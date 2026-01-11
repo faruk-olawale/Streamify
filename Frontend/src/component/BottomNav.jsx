@@ -54,7 +54,7 @@ const BottomNav = () => {
             <Users size={24} className={isActive("/groups") ? "fill-current" : ""} />
           </Link>
 
-          {/* Profile - UPDATED WITH AVATAR COMPONENT */}
+          {/* Profile */}
           <Link
             to="/profile"
             className={`flex flex-col items-center justify-center w-16 h-12 rounded-lg transition-colors ${
@@ -62,14 +62,12 @@ const BottomNav = () => {
             }`}
           >
             {authUser?.profilePic ? (
-              <div className={isActive("/profile") ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 rounded-full" : ""}>
-                <Avatar 
-                  src={authUser.profilePic} 
-                  alt={authUser.fullName || 'Profile'}
-                  size="xs"
-                  showRing={false}
-                />
-              </div>
+              <Avatar 
+                src={authUser.profilePic} 
+                alt={authUser.fullName || 'Profile'}
+                size="sm"
+                showRing={isActive("/profile")}
+              />
             ) : (
               <UserCircle size={24} className={isActive("/profile") ? "fill-current" : ""} />
             )}
