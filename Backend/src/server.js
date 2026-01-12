@@ -9,6 +9,8 @@ import userRoutes from "./routes/user.routes.js";
 import chatRoutes from "./routes/chat.route.js";
 import groupRoutes from "./routes/group.route.js";
 import uploadRoutes from "./routes/upload.route.js";
+import matchingRoutes from "./routes/matching.route.js";
+
 
 import { connectDB } from "./lib/db.js";
 
@@ -31,7 +33,7 @@ app.use("/api/users", userRoutes);  // Keep only this one
 app.use("/api/chat", chatRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/upload", uploadRoutes);
-// REMOVE THIS LINE: app.use("/api/user", userRoutes);
+app.use("/api/matching", matchingRoutes);
 
 // Log all registered routes
 console.log("=== REGISTERED ROUTES ===");

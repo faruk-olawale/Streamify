@@ -7,7 +7,7 @@ import {
   sendFriendReqests,
 } from "../lib/api";
 import { Link } from "react-router";
-import { UserIcon } from "lucide-react";
+import { Sparkles, UserIcon } from "lucide-react";
 import FriendCard from "../component/FriendCard";
 import NoFriendsFound from "../component/NoFriendsFound";
 
@@ -15,7 +15,9 @@ const HomePage = () => {
   const queryClient = useQueryClient();
   const [outgoingRequestIds, setOutgoingRequestIds] = useState(new Set());
 
-  // Queries
+  /* =======================
+     QUERIES
+  ======================= */
   const { data: friends = [], isLoading: loadingFriends } = useQuery({
     queryKey: ["friends"],
     queryFn: getUserFriends,
@@ -31,34 +33,73 @@ const HomePage = () => {
     queryFn: getOutgoingFriendsReqs,
   });
 
-  // Mutation
+  /* =======================
+     MUTATION
+  ======================= */
   const { mutateAsync: sendRequestMutation } = useMutation({
     mutationFn: sendFriendReqests,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["outgoingFriendsReqs"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["outgoingFriendsReqs"] }),
   });
 
-  // Track outgoing requests
+  /* =======================
+     TRACK OUTGOING REQUESTS
+  ======================= */
   useEffect(() => {
-    const outgoingIds = new Set();
-    if (outgoingFriendsReqs?.length) {
-      outgoingFriendsReqs.forEach((req) => outgoingIds.add(req.recipient._id));
-      setOutgoingRequestIds(outgoingIds);
-    }
+    const ids = new Set();
+    outgoingFriendsReqs?.forEach((req) => ids.add(req.recipient._id));
+    setOutgoingRequestIds(ids);
   }, [outgoingFriendsReqs]);
 
   return (
     <div className="min-h-screen bg-base-100 px-4 sm:px-6 lg:px-8 py-6">
       <div className="container mx-auto space-y-10">
-        {/* FRIENDS HEADER */}
+
+        {/* =======================
+           FEATURED FIND PARTNERS BANNER
+        ======================= */}
+        <Link
+          to="/find-partners"
+          className="block card bg-gradient-to-r from-primary to-secondary text-primary-content hover:shadow-xl transition-all"
+        >
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Sparkles size={32} />
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold">
+                    Find Practice Partners
+                  </h3>
+                  <p className="text-sm opacity-90">
+                    Smart matches based on your learning goals and availability
+                  </p>
+                </div>
+              </div>
+
+              <span className="hidden sm:inline btn btn-ghost text-primary-content">
+                Browse Matches →
+              </span>
+            </div>
+          </div>
+        </Link>
+
+        {/* =======================
+           FRIENDS HEADER
+        ======================= */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-wider">Your Friends</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-wider">
+            Your Friends
+          </h2>
+
           <Link to="/notifications" className="btn btn-outline btn-sm">
             <UserIcon className="mr-2 size-4" />
-            Friends Requests
+            Friend Requests
           </Link>
         </div>
 
-        {/* FRIENDS LIST */}
+        {/* =======================
+           FRIENDS LIST
+        ======================= */}
         {loadingFriends ? (
           <div className="flex justify-center py-12">
             <span className="loading loading-spinner loading-lg" />
@@ -71,19 +112,30 @@ const HomePage = () => {
               <FriendCard
                 key={friend._id}
                 friend={friend}
-                isFriend={true} // This shows the "Message" button
+                isFriend={true}
               />
             ))}
           </div>
         )}
 
-        {/* RECOMMENDED USERS */}
+        {/* =======================
+           MEET NEW LEARNERS
+        ======================= */}
         <section>
-          <div className="mb-6 sm:mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Meet New Learners</h2>
-            <p className="opacity-70">
-              Discover perfect language exchange partners based on your profile
-            </p>
+          <div className="mb-6 sm:mb-8 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Meet New Learners
+              </h2>
+              <p className="opacity-70">
+                Discover new people — or use smart matching for better results
+              </p>
+            </div>
+
+            <Link to="/find-partners" className="btn btn-primary gap-2">
+              <Sparkles size={18} />
+              <span className="hidden sm:inline">Smart Matches</span>
+            </Link>
           </div>
 
           {loadingUsers ? (
@@ -92,9 +144,11 @@ const HomePage = () => {
             </div>
           ) : recommendedUsers.length === 0 ? (
             <div className="card bg-base-200 p-6 text-center">
-              <h3 className="font-semibold text-lg mb-2">No recommendations available</h3>
-              <p className="text-base-content opacity-70">
-                Check back later for new language partners!
+              <h3 className="font-semibold text-lg mb-2">
+                No recommendations available
+              </h3>
+              <p className="opacity-70">
+                Complete your profile to get better matches
               </p>
             </div>
           ) : (
@@ -105,7 +159,7 @@ const HomePage = () => {
                   friend={user}
                   sendRequest={sendRequestMutation}
                   isRequestSent={outgoingRequestIds.has(user._id)}
-                  isFriend={false} // This shows the "Send Friend Request" button
+                  isFriend={false}
                 />
               ))}
             </div>

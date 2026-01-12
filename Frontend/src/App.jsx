@@ -16,6 +16,7 @@ import OnboardingPage from "./pages/OnboardingPage.jsx";
 import GroupsPage from "./pages/GroupsPage.jsx";
 import GroupChatPage from "./pages/GroupChatPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
+import FindPartnersPage from "./pages/FindPartnersPage";
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -151,6 +152,8 @@ const App = () => {
             )
           }
         />
+
+      <Route path="/find-partners" element={<FindPartnersPage />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

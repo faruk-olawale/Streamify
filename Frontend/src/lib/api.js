@@ -200,3 +200,24 @@ export async function updateProfile(data) {
   const res = await axiosInstance.put("/users/update-profile", data);
   return res.data;
 }
+
+// Matching API
+export async function getRecommendedPartners(limit = 10) {
+  const res = await axiosInstance.get(`/matching/partners?limit=${limit}`);
+  return res.data;
+}
+
+export async function getCompatibilityWithUser(userId) {
+  const res = await axiosInstance.get(`/matching/compatibility/${userId}`);
+  return res.data;
+}
+
+export async function getMatchExplanation(userId) {
+  const res = await axiosInstance.get(`/matching/explanation/${userId}`);
+  return res.data;
+}
+
+export async function refreshMatches() {
+  const res = await axiosInstance.post("/matching/refresh");
+  return res.data;
+}
