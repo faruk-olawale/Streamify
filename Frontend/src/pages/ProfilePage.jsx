@@ -1,21 +1,90 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import useAuthUser from "../hooks/useAuthUser";
-import { logout } from "../lib/api";
-import { LogOut, Edit, Camera, Loader, MapPin, Globe } from "lucide-react";
+import { logout, updateProfile } from "../lib/api";
+import { LogOut, Camera, MapPin, Target, Clock, Check, Loader, ChevronRight } from "lucide-react";
 import ThemeSelector from "../component/ThemeSelector";
 import { LANGUAGES } from "../constants";
 import toast from "react-hot-toast";
-import { updateProfile } from "../lib/api"; // You'll need to create this
 import { generateRandomAvatar } from "../utils/avatar-helper";
 import Avatar from "../component/Avatar";
+import { calculateProfileCompleteness } from "../utils/profileHelper";
+
+const LEARNING_GOALS = [
+  'Conversation', 'Pronunciation', 'Grammar', 
+  'Writing', 'Reading', 'Business', 'Travel'
+];
+
+const AVAILABILITY_OPTIONS = [
+  'Mornings', 'Afternoons', 'Evenings', 
+  'Weekends', 'Weekdays', 'Flexible'
+];
 
 const ProfilePage = () => {
   const { authUser } = useAuthUser();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState(null);
+  const [savingField, setSavingField] = useState(null);
+  // Initialize with empty strings to avoid controlled/uncontrolled warning
+  const [formData, setFormData] = useState({
+    fullName: "",
+    bio: "",
+    location: "",
+    profilePic: "",
+    nativeLanguages: "",
+    learningLanguages: "",
+    learningGoals: [],
+    availability: [],
+  });
+
+  // Initialize form data when authUser changes
+  useEffect(() => {
+    if (authUser) {
+      setFormData({
+        fullName: authUser.fullName || "",
+        bio: authUser.bio || "",
+        location: authUser.location || "",
+        profilePic: authUser.profilePic || "",
+        nativeLanguages: authUser.nativeLanguages?.[0] || "",
+        learningLanguages: authUser.learningLanguages?.[0] || "",
+        learningGoals: authUser.learningGoals || [],
+        availability: authUser.availability || [],
+      });
+    } else {
+      // Ensure defaults if no authUser
+      setFormData({
+        fullName: "",
+        bio: "",
+        location: "",
+        profilePic: "",
+        nativeLanguages: "",
+        learningLanguages: "",
+        learningGoals: [],
+        availability: [],
+      });
+    }
+  }, [authUser]);
+
+  const { mutate: updateProfileMutation } = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: (data) => {
+      setSavingField(null);
+      setEditingField(null);
+      toast.success("Saved!");
+      // Update the cache with new data
+      queryClient.setQueryData(["authUser"], (old) => ({
+        ...old,
+        user: data.user
+      }));
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+    },
+    onError: (error) => {
+      setSavingField(null);
+      toast.error(error.response?.data?.message || "Failed to save");
+    },
+  });
 
   const { mutate: logoutMutation } = useMutation({
     mutationFn: logout,
@@ -25,154 +94,9 @@ const ProfilePage = () => {
     },
   });
 
-  return (
-    <div className="bg-base-100 pt-0 flex flex-col">
-      {/* Header */}
-      <div className="bg-base-200 p-6 text-center flex-shrink-0 relative">
-        {/* Edit Button */}
-        <button
-          onClick={() => setIsEditModalOpen(true)}
-          className="btn btn-circle btn-sm absolute top-4 right-4"
-          aria-label="Edit profile"
-        >
-          <Edit size={16} />
-        </button>
-
-        <Avatar 
-          src={authUser?.profilePic}
-          alt={authUser?.fullName}
-          size="xl"
-          showRing={true}
-          className="mb-4"
-        />
-        <h2 className="text-2xl font-bold">{authUser?.fullName}</h2>
-        <p className="text-base-content/60">{authUser?.email}</p>
-      </div>
-
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Profile Info */}
-        <div className="space-y-2">
-          <div className="card bg-base-200">
-            <div className="card-body">
-              <h3 className="card-title text-lg">Bio</h3>
-              <p className="text-base-content/70">
-                {authUser?.bio || "No bio yet"}
-              </p>
-            </div>
-          </div>
-
-          <div className="card bg-base-200">
-            <div className="card-body">
-              <h3 className="card-title text-lg">Location</h3>
-              <p className="text-base-content/70 flex items-center gap-2">
-                <MapPin size={16} />
-                {authUser?.location || "Not specified"}
-              </p>
-            </div>
-          </div>
-
-          <div className="card bg-base-200">
-            <div className="card-body">
-              <h3 className="card-title text-lg">Languages</h3>
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <span className="font-semibold">Native:</span>
-                  {authUser?.nativeLanguages && authUser.nativeLanguages.length > 0 ? (
-                    authUser.nativeLanguages.map((lang) => (
-                      <span key={lang} className="badge badge-secondary">
-                        {lang}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-base-content/70">Not specified</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="font-semibold">Learning:</span>
-                  {authUser?.learningLanguages && authUser.learningLanguages.length > 0 ? (
-                    authUser.learningLanguages.map((lang) => (
-                      <span key={lang} className="badge badge-outline">
-                        {lang}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-base-content/70">Not specified</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Settings Section */}
-        <div className="space-y-2">
-          <h3 className="font-semibold text-lg mb-2">Settings</h3>
-
-          {/* Theme */}
-          <div className="card bg-base-200">
-            <div className="card-body flex items-center justify-between">
-              <span className="font-medium">Theme</span>
-              <div className="dropdown dropdown-top">
-                <ThemeSelector />
-              </div>
-            </div>
-          </div>
-
-          {/* Logout Button */}
-          <button
-            onClick={() => {
-              if (confirm("Are you sure you want to logout?")) {
-                logoutMutation();
-              }
-            }}
-            className="btn btn-error btn-block gap-2"
-          >
-            <LogOut size={20} />
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Edit Profile Modal */}
-      {isEditModalOpen && (
-        <EditProfileModal
-          authUser={authUser}
-          onClose={() => setIsEditModalOpen(false)}
-          queryClient={queryClient}
-        />
-      )}
-    </div>
-  );
-};
-
-// Edit Profile Modal Component
-function EditProfileModal({ authUser, onClose, queryClient }) {
-  const [formData, setFormData] = useState({
-    fullName: authUser?.fullName || "",
-    bio: authUser?.bio || "",
-    location: authUser?.location || "",
-    profilePic: authUser?.profilePic || "",
-    nativeLanguages: authUser?.nativeLanguages?.[0] || "",
-    learningLanguages: authUser?.learningLanguages?.[0] || "",
-  });
-
-  const { mutate: updateProfileMutation, isPending } = useMutation({
-    mutationFn: updateProfile,
-    onSuccess: () => {
-      toast.success("Profile updated successfully!");
-      queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to update profile");
-    },
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Convert languages to arrays
+  const handleSaveField = (field) => {
+    setSavingField(field);
+    
     const updatedData = {
       ...formData,
       nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : [],
@@ -185,147 +109,340 @@ function EditProfileModal({ authUser, onClose, queryClient }) {
   const handleGenerateAvatar = () => {
     const randomAvatar = generateRandomAvatar(formData.fullName || 'User', 'ui-avatars');
     setFormData({ ...formData, profilePic: randomAvatar });
-    toast.success("Random avatar generated!");
+    setSavingField('profilePic');
+    updateProfileMutation({
+      ...formData,
+      profilePic: randomAvatar,
+      nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : [],
+      learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : [],
+    });
+  };
+
+  const toggleArrayItem = (field, value) => {
+    const newArray = formData[field].includes(value)
+      ? formData[field].filter(item => item !== value)
+      : [...formData[field], value];
+    
+    setFormData({ ...formData, [field]: newArray });
+    setSavingField(field);
+    
+    updateProfileMutation({
+      ...formData,
+      [field]: newArray,
+      nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : [],
+      learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : [],
+    });
+  };
+
+  // Calculate profile completeness
+  const completeness = calculateProfileCompleteness(authUser);
+  const completionPercentage = completeness?.score || 0;
+
+  return (
+    <div className="bg-base-100 min-h-screen pb-24 lg:pb-6">
+      {/* Header with Avatar */}
+      <div className="bg-base-200 p-6 text-center">
+        <div className="relative inline-block">
+          <Avatar 
+            src={formData.profilePic}
+            alt={formData.fullName}
+            size="2xl"
+            showRing={true}
+          />
+          <button
+            onClick={handleGenerateAvatar}
+            className="btn btn-circle btn-sm btn-primary absolute bottom-0 right-0"
+            disabled={savingField === 'profilePic'}
+          >
+            {savingField === 'profilePic' ? (
+              <Loader className="animate-spin" size={16} />
+            ) : (
+              <Camera size={16} />
+            )}
+          </button>
+        </div>
+        <p className="text-sm text-base-content/60 mt-2">{authUser?.email}</p>
+        
+        {/* Profile Completion */}
+        <div className="mt-4 max-w-xs mx-auto">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="font-semibold">Profile Completion</span>
+            <span className={`font-bold ${completionPercentage === 100 ? 'text-success' : 'text-warning'}`}>
+              {completionPercentage}%
+            </span>
+          </div>
+          <progress 
+            className={`progress ${completionPercentage === 100 ? 'progress-success' : 'progress-warning'} w-full`} 
+            value={completionPercentage} 
+            max="100"
+          ></progress>
+        </div>
+      </div>
+
+      {/* Editable Fields */}
+      <div className="max-w-2xl mx-auto p-4 space-y-2">
+        
+        {/* Full Name */}
+        <EditableField
+          label="Name"
+          value={formData.fullName}
+          field="fullName"
+          editingField={editingField}
+          savingField={savingField}
+          setEditingField={setEditingField}
+          onChange={(value) => setFormData({ ...formData, fullName: value })}
+          onSave={() => handleSaveField('fullName')}
+          type="text"
+          placeholder="Your full name"
+          required
+        />
+
+        {/* Bio */}
+        <EditableField
+          label="Bio"
+          value={formData.bio}
+          field="bio"
+          editingField={editingField}
+          savingField={savingField}
+          setEditingField={setEditingField}
+          onChange={(value) => setFormData({ ...formData, bio: value })}
+          onSave={() => handleSaveField('bio')}
+          type="textarea"
+          placeholder="Tell others about yourself..."
+        />
+
+        {/* Location */}
+        <EditableField
+          label="Location"
+          value={formData.location}
+          field="location"
+          editingField={editingField}
+          savingField={savingField}
+          setEditingField={setEditingField}
+          onChange={(value) => setFormData({ ...formData, location: value })}
+          onSave={() => handleSaveField('location')}
+          type="text"
+          placeholder="City, Country"
+          icon={<MapPin size={18} />}
+        />
+
+        {/* Native Language */}
+        <EditableField
+          label="Native Language"
+          value={formData.nativeLanguages}
+          field="nativeLanguages"
+          editingField={editingField}
+          savingField={savingField}
+          setEditingField={setEditingField}
+          onChange={(value) => setFormData({ ...formData, nativeLanguages: value })}
+          onSave={() => handleSaveField('nativeLanguages')}
+          type="select"
+          options={LANGUAGES}
+          placeholder="Select language"
+        />
+
+        {/* Learning Language */}
+        <EditableField
+          label="Learning Language"
+          value={formData.learningLanguages}
+          field="learningLanguages"
+          editingField={editingField}
+          savingField={savingField}
+          setEditingField={setEditingField}
+          onChange={(value) => setFormData({ ...formData, learningLanguages: value })}
+          onSave={() => handleSaveField('learningLanguages')}
+          type="select"
+          options={LANGUAGES}
+          placeholder="Select language"
+        />
+
+        {/* Learning Goals */}
+        <div className="card bg-base-200">
+          <div className="card-body p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Target size={18} />
+                Learning Goals
+              </h3>
+              {savingField === 'learningGoals' && (
+                <span className="loading loading-spinner loading-sm"></span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {LEARNING_GOALS.map(goal => (
+                <button
+                  key={goal}
+                  onClick={() => toggleArrayItem('learningGoals', goal)}
+                  className={`badge badge-lg cursor-pointer transition-all ${
+                    formData.learningGoals?.includes(goal)
+                      ? 'badge-primary'
+                      : 'badge-outline hover:badge-primary'
+                  }`}
+                >
+                  {goal}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Availability */}
+        <div className="card bg-base-200">
+          <div className="card-body p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Clock size={18} />
+                Availability
+              </h3>
+              {savingField === 'availability' && (
+                <span className="loading loading-spinner loading-sm"></span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABILITY_OPTIONS.map(time => (
+                <button
+                  key={time}
+                  onClick={() => toggleArrayItem('availability', time)}
+                  className={`badge badge-lg cursor-pointer transition-all ${
+                    formData.availability?.includes(time)
+                      ? 'badge-accent'
+                      : 'badge-outline hover:badge-accent'
+                  }`}
+                >
+                  {time}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Settings Section */}
+        <div className="divider mt-6">Settings</div>
+
+        {/* Theme */}
+        <div className="card bg-base-200">
+          <div className="card-body p-4 flex flex-row items-center justify-between">
+            <span className="font-medium">Theme</span>
+            <ThemeSelector />
+          </div>
+        </div>
+
+        {/* Logout */}
+        <button
+          onClick={() => {
+            if (confirm("Are you sure you want to logout?")) {
+              logoutMutation();
+            }
+          }}
+          className="btn btn-error btn-block gap-2"
+        >
+          <LogOut size={20} />
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Editable Field Component
+function EditableField({
+  label,
+  value = "", // Always default to empty string
+  field,
+  editingField,
+  savingField,
+  setEditingField,
+  onChange,
+  onSave,
+  type = "text",
+  placeholder,
+  icon,
+  options,
+  required = false
+}) {
+  const isEditing = editingField === field;
+  const isSaving = savingField === field;
+
+  const handleBlur = () => {
+    if (isEditing && value) {
+      onSave();
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && type !== 'textarea') {
+      e.preventDefault();
+      if (value) {
+        onSave();
+      }
+    }
   };
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-box max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h3 className="font-bold text-2xl mb-4">Edit Profile</h3>
+    <div className="card bg-base-200 hover:bg-base-300 transition-colors">
+      <div className="card-body p-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="font-semibold text-sm flex items-center gap-2">
+            {icon}
+            {label}
+          </label>
+          {isSaving ? (
+            <span className="flex items-center gap-1 text-sm text-success">
+              <Check size={14} />
+              Saved
+            </span>
+          ) : !isEditing && (
+            <ChevronRight size={18} className="text-base-content/40" />
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Profile Picture */}
-          <div className="flex flex-col items-center space-y-3">
-            <Avatar 
-                src={formData.profilePic}
-                alt={formData.fullName}
-                size="xl"
-                showRing={true}
-              />
-            <button
-              type="button"
-              onClick={handleGenerateAvatar}
-              className="btn btn-sm btn-outline gap-2"
-            >
-              <Camera size={16} />
-              Generate Random Avatar
-            </button>
-          </div>
+        {type === 'textarea' ? (
+          <textarea
+            value={value || ""} // Ensure always controlled
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setEditingField(field)}
+            onBlur={handleBlur}
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+            className="textarea textarea-bordered w-full"
+            rows="3"
+          />
+        ) : type === 'select' ? (
+          <select
+            value={value || ""} // Ensure always controlled
+            onChange={(e) => {
+              onChange(e.target.value);
+              setSavingField(field);
+              setTimeout(onSave, 100);
+            }}
+            className="select select-bordered w-full"
+          >
+            <option value="">{placeholder}</option>
+            {options?.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={type}
+            value={value || ""} // Ensure always controlled
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setEditingField(field)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+            className="input input-bordered w-full"
+            required={required}
+          />
+        )}
 
-          {/* Full Name */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-semibold">Full Name</span>
-            </label>
-            <input
-              type="text"
-              value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              className="input input-bordered"
-              placeholder="Your full name"
-              required
-            />
-          </div>
-
-          {/* Bio */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-semibold">Bio</span>
-            </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              className="textarea textarea-bordered h-24"
-              placeholder="Tell others about yourself and your language learning goals"
-            />
-          </div>
-
-          {/* Location */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-semibold">Location</span>
-            </label>
-            <div className="relative">
-              <MapPin className="absolute top-1/2 transform -translate-y-1/2 left-3 size-5 text-base-content opacity-70" />
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="input input-bordered w-full pl-10"
-                placeholder="City, Country"
-              />
-            </div>
-          </div>
-
-          {/* Languages */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Native Language */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-semibold">Native Language</span>
-              </label>
-              <select
-                value={formData.nativeLanguages}
-                onChange={(e) => setFormData({ ...formData, nativeLanguages: e.target.value })}
-                className="select select-bordered"
-              >
-                <option value="">Select native language</option>
-                {LANGUAGES.map((lang) => (
-                  <option key={`native-${lang}`} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Learning Language */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-semibold">Learning Language</span>
-              </label>
-              <select
-                value={formData.learningLanguages}
-                onChange={(e) => setFormData({ ...formData, learningLanguages: e.target.value })}
-                className="select select-bordered"
-              >
-                <option value="">Select learning language</option>
-                {LANGUAGES.map((lang) => (
-                  <option key={`learning-${lang}`} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Modal Actions */}
-          <div className="modal-action">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-ghost"
-              disabled={isPending}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isPending}
-            >
-              {isPending ? (
-                <>
-                  <Loader className="animate-spin" size={16} />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
-          </div>
-        </form>
+        {!value && (
+          <p className="text-xs text-base-content/50 mt-1">
+            Tap to {isEditing ? 'enter' : 'edit'}
+          </p>
+        )}
       </div>
-      <div className="modal-backdrop" onClick={onClose}></div>
     </div>
   );
 }

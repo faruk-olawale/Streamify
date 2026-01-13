@@ -209,15 +209,22 @@ export const markFriendNotificationsRead = async (req, res) => {
 };
 
 
-/**
- * Update user profile
- */
+
 export async function updateProfile(req, res) {
   try {
     const userId = req.user._id;
-    const { fullName, bio, location, profilePic, nativeLanguages, learningLanguages } = req.body;
+    const { 
+      fullName, 
+      bio, 
+      location, 
+      profilePic, 
+      nativeLanguages, 
+      learningLanguages,
+      learningGoals,
+      availability 
+    } = req.body;
 
-    // Build update object with only provided fields
+    // Build update object
     const updateData = {};
     if (fullName !== undefined) updateData.fullName = fullName;
     if (bio !== undefined) updateData.bio = bio;
@@ -225,19 +232,21 @@ export async function updateProfile(req, res) {
     if (profilePic !== undefined) updateData.profilePic = profilePic;
     if (nativeLanguages !== undefined) updateData.nativeLanguages = nativeLanguages;
     if (learningLanguages !== undefined) updateData.learningLanguages = learningLanguages;
+    if (learningGoals !== undefined) updateData.learningGoals = learningGoals;
+    if (availability !== undefined) updateData.availability = availability;
 
     // Update user in database
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
-      { new: true }
+      { new: true, runValidators: true }
     ).select("-password");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Sync with Stream if name or profile pic changed
+    // Sync with Stream if name or pic changed
     if (fullName !== undefined || profilePic !== undefined) {
       try {
         await upsertStreamUser({
@@ -245,7 +254,6 @@ export async function updateProfile(req, res) {
           name: updatedUser.fullName,
           image: updatedUser.profilePic || "",
         });
-        console.log("Stream user updated successfully");
       } catch (streamError) {
         console.log("Error syncing with Stream:", streamError.message);
       }
