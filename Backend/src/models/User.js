@@ -24,17 +24,24 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: "",
     },
-    // FIXED: Changed from String to Array of Strings
     nativeLanguages: { 
-        type: [String],  // Array of strings
-        default: []      // Empty array instead of "English"
+        type: [String],
+        default: []
     },
     
-    // FIXED: Changed from String to Array of Strings
     learningLanguages: {
-        type: [String],  // Array of strings
-        default: []      // Empty array
+        type: [String],
+        default: []
     },
+
+    // NEW FIELDS
+    learningGoals: [{
+        type: String,
+    }],
+    
+    availability: [{
+        type: String,
+    }],
 
     location:{
         type: String,
@@ -55,6 +62,7 @@ const userSchema = new mongoose.Schema({
 
 // pre hook - MUST come BEFORE mongoose.model()
 userSchema.pre("save", async function (next) {
+  // Only hash if password is modified
   if (!this.isModified("password")) return next();
 
   try {
@@ -66,7 +74,18 @@ userSchema.pre("save", async function (next) {
   }
 });
 
+// FIXED: Add error handling for undefined password
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) {
+    console.error("❌ User has no password field:", this.email);
+    return false;
+  }
+  
+  if (!enteredPassword) {
+    console.error("❌ No password provided for comparison");
+    return false;
+  }
+  
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

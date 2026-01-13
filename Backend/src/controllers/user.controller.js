@@ -224,6 +224,13 @@ export async function updateProfile(req, res) {
       availability 
     } = req.body;
 
+    console.log("📥 Update profile request:", {
+      userId,
+      learningGoals,
+      availability,
+      fullBody: req.body
+    });
+
     // Build update object
     const updateData = {};
     if (fullName !== undefined) updateData.fullName = fullName;
@@ -235,6 +242,8 @@ export async function updateProfile(req, res) {
     if (learningGoals !== undefined) updateData.learningGoals = learningGoals;
     if (availability !== undefined) updateData.availability = availability;
 
+    console.log("💾 Saving to database:", updateData);
+
     // Update user in database
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -245,6 +254,11 @@ export async function updateProfile(req, res) {
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    console.log("✅ User updated successfully:", {
+      learningGoals: updatedUser.learningGoals,
+      availability: updatedUser.availability
+    });
 
     // Sync with Stream if name or pic changed
     if (fullName !== undefined || profilePic !== undefined) {
@@ -265,7 +279,7 @@ export async function updateProfile(req, res) {
       message: "Profile updated successfully",
     });
   } catch (error) {
-    console.log("Error in updateProfile controller:", error);
+    console.log("❌ Error in updateProfile controller:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

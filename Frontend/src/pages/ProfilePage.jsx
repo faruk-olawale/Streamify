@@ -70,17 +70,28 @@ const ProfilePage = () => {
   const { mutate: updateProfileMutation } = useMutation({
     mutationFn: updateProfile,
     onSuccess: (data) => {
+      console.log("✅ Profile update response:", data);
       setSavingField(null);
       setEditingField(null);
-      toast.success("Saved!");
-      // Update the cache with new data
-      queryClient.setQueryData(["authUser"], (old) => ({
-        ...old,
-        user: data.user
-      }));
+      
+      // CRITICAL: Update the local cache immediately
+      queryClient.setQueryData(["authUser"], (old) => {
+        console.log("📦 Updating cache from:", old?.user);
+        console.log("📦 Updating cache to:", data.user);
+        return {
+          ...old,
+          user: data.user,
+          success: true
+        };
+      });
+      
+      // Force re-fetch to ensure sync
       queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      
+      toast.success("Saved!", { duration: 1000 });
     },
     onError: (error) => {
+      console.error("❌ Profile update error:", error);
       setSavingField(null);
       toast.error(error.response?.data?.message || "Failed to save");
     },
@@ -119,24 +130,49 @@ const ProfilePage = () => {
   };
 
   const toggleArrayItem = (field, value) => {
-    const newArray = formData[field].includes(value)
-      ? formData[field].filter(item => item !== value)
-      : [...formData[field], value];
+    const currentArray = formData[field] || [];
+    const newArray = currentArray.includes(value)
+      ? currentArray.filter(item => item !== value)
+      : [...currentArray, value];
     
+    // Update local state immediately
     setFormData({ ...formData, [field]: newArray });
     setSavingField(field);
     
-    updateProfileMutation({
+    console.log(`🔄 Updating ${field}:`, newArray);
+    
+    // Prepare data for backend
+    const dataToSend = {
       ...formData,
       [field]: newArray,
       nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : [],
       learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : [],
-    });
+    };
+    
+    console.log("📤 Sending to backend:", dataToSend);
+    
+    updateProfileMutation(dataToSend);
   };
 
-  // Calculate profile completeness
-  const completeness = calculateProfileCompleteness(authUser);
+  // Calculate profile completeness - use formData for real-time updates
+  const liveUserData = {
+    ...authUser,
+    ...formData,
+    // Convert single language strings to arrays for completeness calculation
+    nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : authUser?.nativeLanguages || [],
+    learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : authUser?.learningLanguages || [],
+  };
+  
+  const completeness = calculateProfileCompleteness(liveUserData);
   const completionPercentage = completeness?.score || 0;
+
+  console.log("📊 Profile completeness:", {
+    authUser: authUser,
+    formData: formData,
+    liveUserData: liveUserData,
+    completeness: completeness,
+    percentage: completionPercentage
+  });
 
   return (
     <div className="bg-base-100 min-h-screen pb-24 lg:pb-6">
@@ -379,7 +415,7 @@ function EditableField({
   };
 
   return (
-    <div className="card bg-base-200 hover:bg-base-300 transition-colors">
+    <div className=" card bg-base-200 hover:bg-base-300 transition-colors">
       <div className="card-body p-4">
         <div className="flex items-center justify-between mb-2">
           <label className="font-semibold text-sm flex items-center gap-2">
