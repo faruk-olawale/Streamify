@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import useAuthUser from "../hooks/useAuthUser";
 import { logout, updateProfile } from "../lib/api";
@@ -24,10 +24,20 @@ const AVAILABILITY_OPTIONS = [
 const ProfilePage = () => {
   const { authUser } = useAuthUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [editingField, setEditingField] = useState(null);
   const [savingField, setSavingField] = useState(null);
-  // Initialize with empty strings to avoid controlled/uncontrolled warning
+  
+  // Check if we came from Find Partner page
+  const returnToFindPartner = location.state?.from === 'find-partner';
+  
+  console.log("🚀 ProfilePage Mount:", {
+    locationState: location.state,
+    from: location.state?.from,
+    returnToFindPartner
+  });
+  
   const [formData, setFormData] = useState({
     fullName: "",
     bio: "",
@@ -39,7 +49,6 @@ const ProfilePage = () => {
     availability: [],
   });
 
-  // Initialize form data when authUser changes
   useEffect(() => {
     if (authUser) {
       setFormData({
@@ -53,7 +62,6 @@ const ProfilePage = () => {
         availability: authUser.availability || [],
       });
     } else {
-      // Ensure defaults if no authUser
       setFormData({
         fullName: "",
         bio: "",
@@ -74,7 +82,6 @@ const ProfilePage = () => {
       setSavingField(null);
       setEditingField(null);
       
-      // CRITICAL: Update the local cache immediately
       queryClient.setQueryData(["authUser"], (old) => {
         console.log("📦 Updating cache from:", old?.user);
         console.log("📦 Updating cache to:", data.user);
@@ -85,7 +92,6 @@ const ProfilePage = () => {
         };
       });
       
-      // Force re-fetch to ensure sync
       queryClient.invalidateQueries({ queryKey: ["authUser"] });
       
       toast.success("Saved!", { duration: 1000 });
@@ -135,13 +141,11 @@ const ProfilePage = () => {
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
     
-    // Update local state immediately
     setFormData({ ...formData, [field]: newArray });
     setSavingField(field);
     
     console.log(`🔄 Updating ${field}:`, newArray);
     
-    // Prepare data for backend
     const dataToSend = {
       ...formData,
       [field]: newArray,
@@ -154,11 +158,9 @@ const ProfilePage = () => {
     updateProfileMutation(dataToSend);
   };
 
-  // Calculate profile completeness - use formData for real-time updates
   const liveUserData = {
     ...authUser,
     ...formData,
-    // Convert single language strings to arrays for completeness calculation
     nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : authUser?.nativeLanguages || [],
     learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : authUser?.learningLanguages || [],
   };
@@ -174,10 +176,50 @@ const ProfilePage = () => {
     percentage: completionPercentage
   });
 
+  // Show success message when profile is complete (no auto-redirect)
+  useEffect(() => {
+    if (returnToFindPartner && completionPercentage === 100) {
+      console.log("🎉 Profile complete! Should show success banner");
+      toast.success("Profile completed! 🎉", { duration: 3000 });
+    }
+  }, [completionPercentage, returnToFindPartner]);
+
+  console.log("🔍 Banner Debug:", {
+    returnToFindPartner,
+    completionPercentage,
+    locationState: location.state,
+    shouldShowIncompleteBanner: returnToFindPartner && completionPercentage < 100,
+    shouldShowSuccessBanner: returnToFindPartner && completionPercentage === 100
+  });
+
   return (
-    <div className="bg-base-100 min-h-screen pb-24 lg:pb-6">
+    <div className="bg-base-100 pb-8">
+      {/* Show banner based on profile completion status */}
+      {returnToFindPartner && completionPercentage < 100 && (
+        <div className="bg-info text-info-content px-4 py-3 sm:py-4 text-center text-sm sm:text-base">
+          <p className="font-semibold">Complete your profile to find language partners</p>
+          <p className="text-xs sm:text-sm opacity-90 mt-1">
+            {completeness?.missingFields?.length || 0} field(s) remaining
+          </p>
+        </div>
+      )}
+      
+      {/* Success banner when profile is complete */}
+      {returnToFindPartner && completionPercentage === 100 && (
+        <div className="bg-success text-success-content px-4 py-4 sm:py-5 text-center">
+          <p className="font-bold text-base sm:text-lg mb-2">🎉 Profile Complete!</p>
+          <p className="text-xs sm:text-sm mb-3">You're all set to find language partners</p>
+          <button 
+            onClick={() => navigate('/find-partner', { replace: true })}
+            className="btn btn-sm sm:btn-md btn-neutral"
+          >
+            Continue to Find Partners
+          </button>
+        </div>
+      )}
+
       {/* Header with Avatar */}
-      <div className="bg-base-200 p-6 text-center">
+      <div className="bg-base-200 px-4 py-6 sm:px-6 sm:py-8 lg:py-10 text-center">
         <div className="relative inline-block">
           <Avatar 
             src={formData.profilePic}
@@ -187,28 +229,30 @@ const ProfilePage = () => {
           />
           <button
             onClick={handleGenerateAvatar}
-            className="btn btn-circle btn-sm btn-primary absolute bottom-0 right-0"
+            className="btn btn-circle btn-xs sm:btn-sm btn-primary absolute bottom-0 right-0 shadow-lg"
             disabled={savingField === 'profilePic'}
           >
             {savingField === 'profilePic' ? (
-              <Loader className="animate-spin" size={16} />
+              <Loader className="animate-spin w-3 h-3 sm:w-4 sm:h-4" />
             ) : (
-              <Camera size={16} />
+              <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
             )}
           </button>
         </div>
-        <p className="text-sm text-base-content/60 mt-2">{authUser?.email}</p>
+        <p className="text-xs sm:text-sm text-base-content/60 mt-2 px-4 break-all">
+          {authUser?.email}
+        </p>
         
         {/* Profile Completion */}
-        <div className="mt-4 max-w-xs mx-auto">
-          <div className="flex items-center justify-between text-sm mb-1">
+        <div className="mt-4 max-w-[280px] sm:max-w-xs mx-auto px-4">
+          <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
             <span className="font-semibold">Profile Completion</span>
             <span className={`font-bold ${completionPercentage === 100 ? 'text-success' : 'text-warning'}`}>
               {completionPercentage}%
             </span>
           </div>
           <progress 
-            className={`progress ${completionPercentage === 100 ? 'progress-success' : 'progress-warning'} w-full`} 
+            className={`progress ${completionPercentage === 100 ? 'progress-success' : 'progress-warning'} w-full h-2`} 
             value={completionPercentage} 
             max="100"
           ></progress>
@@ -216,7 +260,7 @@ const ProfilePage = () => {
       </div>
 
       {/* Editable Fields */}
-      <div className="max-w-2xl mx-auto p-4 space-y-2">
+      <div className="w-full max-w-2xl mx-auto px-3 sm:px-4 lg:px-6 py-4 pb-6 space-y-2 sm:space-y-3">
         
         {/* Full Name */}
         <EditableField
@@ -259,7 +303,7 @@ const ProfilePage = () => {
           onSave={() => handleSaveField('location')}
           type="text"
           placeholder="City, Country"
-          icon={<MapPin size={18} />}
+          icon={<MapPin className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />}
         />
 
         {/* Native Language */}
@@ -294,22 +338,22 @@ const ProfilePage = () => {
 
         {/* Learning Goals */}
         <div className="card bg-base-200">
-          <div className="card-body p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Target size={18} />
+          <div className="card-body p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                <Target className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                 Learning Goals
               </h3>
               {savingField === 'learningGoals' && (
-                <span className="loading loading-spinner loading-sm"></span>
+                <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {LEARNING_GOALS.map(goal => (
                 <button
                   key={goal}
                   onClick={() => toggleArrayItem('learningGoals', goal)}
-                  className={`badge badge-lg cursor-pointer transition-all ${
+                  className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
                     formData.learningGoals?.includes(goal)
                       ? 'badge-primary'
                       : 'badge-outline hover:badge-primary'
@@ -324,22 +368,22 @@ const ProfilePage = () => {
 
         {/* Availability */}
         <div className="card bg-base-200">
-          <div className="card-body p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Clock size={18} />
+          <div className="card-body p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                <Clock className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                 Availability
               </h3>
               {savingField === 'availability' && (
-                <span className="loading loading-spinner loading-sm"></span>
+                <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {AVAILABILITY_OPTIONS.map(time => (
                 <button
                   key={time}
                   onClick={() => toggleArrayItem('availability', time)}
-                  className={`badge badge-lg cursor-pointer transition-all ${
+                  className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
                     formData.availability?.includes(time)
                       ? 'badge-accent'
                       : 'badge-outline hover:badge-accent'
@@ -353,12 +397,12 @@ const ProfilePage = () => {
         </div>
 
         {/* Settings Section */}
-        <div className="divider mt-6">Settings</div>
+        <div className="divider mt-6 sm:mt-8 text-sm sm:text-base">Settings</div>
 
         {/* Theme */}
         <div className="card bg-base-200">
-          <div className="card-body p-4 flex flex-row items-center justify-between">
-            <span className="font-medium">Theme</span>
+          <div className="card-body p-3 sm:p-4 flex flex-row items-center justify-between">
+            <span className="font-medium text-sm sm:text-base">Theme</span>
             <ThemeSelector />
           </div>
         </div>
@@ -370,9 +414,9 @@ const ProfilePage = () => {
               logoutMutation();
             }
           }}
-          className="btn btn-error btn-block gap-2"
+          className="btn btn-error btn-block gap-2 text-sm sm:text-base h-12 sm:h-auto min-h-[48px]"
         >
-          <LogOut size={20} />
+          <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
           Logout
         </button>
       </div>
@@ -383,7 +427,7 @@ const ProfilePage = () => {
 // Editable Field Component
 function EditableField({
   label,
-  value = "", // Always default to empty string
+  value = "",
   field,
   editingField,
   savingField,
@@ -415,42 +459,42 @@ function EditableField({
   };
 
   return (
-    <div className=" card bg-base-200 hover:bg-base-300 transition-colors">
-      <div className="card-body p-4">
+    <div className="card bg-base-200 hover:bg-base-300 transition-colors">
+      <div className="card-body p-3 sm:p-4">
         <div className="flex items-center justify-between mb-2">
-          <label className="font-semibold text-sm flex items-center gap-2">
+          <label className="font-semibold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2">
             {icon}
             {label}
           </label>
           {isSaving ? (
-            <span className="flex items-center gap-1 text-sm text-success">
-              <Check size={14} />
+            <span className="flex items-center gap-1 text-xs sm:text-sm text-success">
+              <Check className="w-3 h-3 sm:w-[14px] sm:h-[14px]" />
               Saved
             </span>
           ) : !isEditing && (
-            <ChevronRight size={18} className="text-base-content/40" />
+            <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-base-content/40" />
           )}
         </div>
 
         {type === 'textarea' ? (
           <textarea
-            value={value || ""} // Ensure always controlled
+            value={value || ""}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setEditingField(field)}
             onBlur={handleBlur}
             placeholder={placeholder || `Enter ${label.toLowerCase()}`}
-            className="textarea textarea-bordered w-full"
+            className="textarea textarea-bordered w-full text-sm sm:text-base min-h-[80px] sm:min-h-[96px]"
             rows="3"
           />
         ) : type === 'select' ? (
           <select
-            value={value || ""} // Ensure always controlled
+            value={value || ""}
             onChange={(e) => {
               onChange(e.target.value);
               setSavingField(field);
               setTimeout(onSave, 100);
             }}
-            className="select select-bordered w-full"
+            className="select select-bordered w-full text-sm sm:text-base h-10 sm:h-12"
           >
             <option value="">{placeholder}</option>
             {options?.map((option) => (
@@ -462,13 +506,13 @@ function EditableField({
         ) : (
           <input
             type={type}
-            value={value || ""} // Ensure always controlled
+            value={value || ""}
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => setEditingField(field)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || `Enter ${label.toLowerCase()}`}
-            className="input input-bordered w-full"
+            className="input input-bordered w-full text-sm sm:text-base h-10 sm:h-12"
             required={required}
           />
         )}

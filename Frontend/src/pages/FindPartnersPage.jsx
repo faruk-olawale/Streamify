@@ -4,7 +4,7 @@ import { getRecommendedPartners, sendFriendReqests } from "../lib/api";
 import { Sparkles, RefreshCw, UserPlus, CheckCircle, Zap, ArrowLeft, AlertCircle, Edit } from "lucide-react";
 import Avatar from "../component/Avatar";
 import toast from "react-hot-toast";
-import { useNavigate, Link } from "react-router";
+import { useNavigate } from "react-router";
 import useAuthUser from "../hooks/useAuthUser";
 import { getRequiredFieldsForMatching } from "../utils/profileHelper";
 
@@ -79,7 +79,7 @@ const FindPartnersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-100 lg:pb-6">
+    <div className="min-h-screen bg-base-100 pb-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-secondary p-4 sm:p-6 text-primary-content">
         <div className="max-w-6xl mx-auto">
@@ -136,10 +136,14 @@ const FindPartnersPage = () => {
                 </ul>
               </div>
             </div>
-            <Link to="/profile" className="btn btn-sm btn-primary gap-2">
+            {/* UPDATED: Pass navigation state */}
+            <button 
+              onClick={() => navigate('/profile', { state: { from: 'find-partner' } })}
+              className="btn btn-sm btn-primary gap-2"
+            >
               <Edit size={16} />
               Complete Profile
-            </Link>
+            </button>
           </div>
         )}
 
@@ -154,10 +158,13 @@ const FindPartnersPage = () => {
                 <Sparkles size={64} className="mx-auto text-base-content/30 mb-4" />
                 <h3 className="text-xl font-bold mb-2">No matches found yet</h3>
                 <p className="text-base-content/70 mb-4">
-                  Complete your learning profile to get better recommendations
+                  Try updating your profile or check back later for new matches
                 </p>
-                <button className="btn btn-primary">
-                  Complete Profile
+                <button 
+                  onClick={() => navigate('/profile')}
+                  className="btn btn-primary"
+                >
+                  Update Profile
                 </button>
               </div>
             ) : (
@@ -171,169 +178,170 @@ const FindPartnersPage = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{matches.map((match) => {
-                const user = match.user;
-                const isRequestSent = sentRequests.has(user._id);
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {matches.map((match) => {
+                    const user = match.user;
+                    const isRequestSent = sentRequests.has(user._id);
 
-                return (
-                  <div
-                    key={user._id}
-                    className="card bg-base-200 hover:shadow-lg transition-all"
-                  >
-                    <div className="card-body p-4">
-                      {/* Match Score Badge with Details */}
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div 
-                            className={`badge badge-lg gap-2 ${getScoreBadgeClass(match.overallScore)}`}
-                          >
-                            <Zap size={14} />
-                            {match.overallScore}% {getScoreLabel(match.overallScore)}
-                          </div>
-                        </div>
-                        <p className="text-xs text-base-content/60">
-                          {getScoreDescription(match.overallScore)}
-                        </p>
-                      </div>
-
-                      {/* User Info */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <Avatar
-                          src={user.profilePic}
-                          alt={user.fullName}
-                          size="lg"
-                          showRing={false}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg truncate">
-                            {user.fullName}
-                          </h3>
-                          {user.location && (
-                            <p className="text-sm text-base-content/60 truncate">
-                              {user.location}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Bio */}
-                      {user.bio && (
-                        <p className="text-sm text-base-content/70 mb-3 line-clamp-2">
-                          {user.bio}
-                        </p>
-                      )}
-
-                      {/* Languages */}
-                      <div className="space-y-2 mb-3">
-                        {user.nativeLanguages && user.nativeLanguages.length > 0 && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-semibold">Speaks:</span>
-                            {user.nativeLanguages.map(lang => (
-                              <span key={lang} className="badge badge-secondary badge-sm">
-                                {lang}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {user.learningLanguages && user.learningLanguages.length > 0 && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-semibold">Learning:</span>
-                            {user.learningLanguages.map(lang => (
-                              <span key={lang} className="badge badge-outline badge-sm">
-                                {lang}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Match Reasons - Enhanced */}
-                      {match.reasons && match.reasons.length > 0 && (
-                        <div className="bg-base-300/50 rounded-lg p-3 mb-3">
-                          <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-primary">
-                            <Sparkles size={14} />
-                            Why {match.overallScore >= 80 ? "you're a great match" : "this might work"}:
-                          </p>
-                          <ul className="text-xs space-y-1.5">
-                            {match.reasons.map((reason, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-success mt-0.5">✓</span>
-                                <span className="flex-1">{reason}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          
-                          {/* Score Breakdown */}
-                          {match.scoreBreakdown && (
-                            <div className="mt-3 pt-3 border-t border-base-content/10">
-                              <p className="text-xs font-semibold mb-2">Match Details:</p>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                {match.scoreBreakdown.languageCompatibility >= 70 && (
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-success"></div>
-                                    <span>Language: {Math.round(match.scoreBreakdown.languageCompatibility)}%</span>
-                                  </div>
-                                )}
-                                {match.scoreBreakdown.availabilityMatch >= 50 && (
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-info"></div>
-                                    <span>Schedule: {Math.round(match.scoreBreakdown.availabilityMatch)}%</span>
-                                  </div>
-                                )}
-                                {match.scoreBreakdown.goalsAlignment >= 50 && (
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-warning"></div>
-                                    <span>Goals: {Math.round(match.scoreBreakdown.goalsAlignment)}%</span>
-                                  </div>
-                                )}
+                    return (
+                      <div
+                        key={user._id}
+                        className="card bg-base-200 hover:shadow-lg transition-all"
+                      >
+                        <div className="card-body p-4">
+                          {/* Match Score Badge with Details */}
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div 
+                                className={`badge badge-lg gap-2 ${getScoreBadgeClass(match.overallScore)}`}
+                              >
+                                <Zap size={14} />
+                                {match.overallScore}% {getScoreLabel(match.overallScore)}
                               </div>
                             </div>
+                            <p className="text-xs text-base-content/60">
+                              {getScoreDescription(match.overallScore)}
+                            </p>
+                          </div>
+
+                          {/* User Info */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <Avatar
+                              src={user.profilePic}
+                              alt={user.fullName}
+                              size="lg"
+                              showRing={false}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-lg truncate">
+                                {user.fullName}
+                              </h3>
+                              {user.location && (
+                                <p className="text-sm text-base-content/60 truncate">
+                                  {user.location}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Bio */}
+                          {user.bio && (
+                            <p className="text-sm text-base-content/70 mb-3 line-clamp-2">
+                              {user.bio}
+                            </p>
                           )}
-                        </div>
-                      )}
 
-                      {/* Goals */}
-                      {user.learningGoals && user.learningGoals.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {user.learningGoals.slice(0, 3).map(goal => (
-                            <span key={goal} className="badge badge-xs badge-ghost">
-                              {goal}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                          {/* Languages */}
+                          <div className="space-y-2 mb-3">
+                            {user.nativeLanguages && user.nativeLanguages.length > 0 && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold">Speaks:</span>
+                                {user.nativeLanguages.map(lang => (
+                                  <span key={lang} className="badge badge-secondary badge-sm">
+                                    {lang}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {user.learningLanguages && user.learningLanguages.length > 0 && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold">Learning:</span>
+                                {user.learningLanguages.map(lang => (
+                                  <span key={lang} className="badge badge-outline badge-sm">
+                                    {lang}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
-                      {/* Availability */}
-                      {user.availability && user.availability.length > 0 && (
-                        <div className="text-xs text-base-content/60 mb-3">
-                          Available: {user.availability.slice(0, 2).join(", ")}
-                        </div>
-                      )}
+                          {/* Match Reasons - Enhanced */}
+                          {match.reasons && match.reasons.length > 0 && (
+                            <div className="bg-base-300/50 rounded-lg p-3 mb-3">
+                              <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-primary">
+                                <Sparkles size={14} />
+                                Why {match.overallScore >= 80 ? "you're a great match" : "this might work"}:
+                              </p>
+                              <ul className="text-xs space-y-1.5">
+                                {match.reasons.map((reason, idx) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="text-success mt-0.5">✓</span>
+                                    <span className="flex-1">{reason}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              
+                              {/* Score Breakdown */}
+                              {match.scoreBreakdown && (
+                                <div className="mt-3 pt-3 border-t border-base-content/10">
+                                  <p className="text-xs font-semibold mb-2">Match Details:</p>
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    {match.scoreBreakdown.languageCompatibility >= 70 && (
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-success"></div>
+                                        <span>Language: {Math.round(match.scoreBreakdown.languageCompatibility)}%</span>
+                                      </div>
+                                    )}
+                                    {match.scoreBreakdown.availabilityMatch >= 50 && (
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-info"></div>
+                                        <span>Schedule: {Math.round(match.scoreBreakdown.availabilityMatch)}%</span>
+                                      </div>
+                                    )}
+                                    {match.scoreBreakdown.goalsAlignment >= 50 && (
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-warning"></div>
+                                        <span>Goals: {Math.round(match.scoreBreakdown.goalsAlignment)}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                      {/* Action Button */}
-                      <button
-                        onClick={() => sendRequestMutation(user._id)}
-                        disabled={isRequestSent}
-                        className={`btn w-full ${
-                          isRequestSent ? "btn-disabled" : "btn-primary"
-                        }`}
-                      >
-                        {isRequestSent ? (
-                          <>
-                            <CheckCircle size={18} />
-                            Request Sent
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus size={18} />
-                            Send Request
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                                  );
-                })}
+                          {/* Goals */}
+                          {user.learningGoals && user.learningGoals.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {user.learningGoals.slice(0, 3).map(goal => (
+                                <span key={goal} className="badge badge-xs badge-ghost">
+                                  {goal}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Availability */}
+                          {user.availability && user.availability.length > 0 && (
+                            <div className="text-xs text-base-content/60 mb-3">
+                              Available: {user.availability.slice(0, 2).join(", ")}
+                            </div>
+                          )}
+
+                          {/* Action Button */}
+                          <button
+                            onClick={() => sendRequestMutation(user._id)}
+                            disabled={isRequestSent}
+                            className={`btn w-full ${
+                              isRequestSent ? "btn-disabled" : "btn-primary"
+                            }`}
+                          >
+                            {isRequestSent ? (
+                              <>
+                                <CheckCircle size={18} />
+                                Request Sent
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus size={18} />
+                                Send Request
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
