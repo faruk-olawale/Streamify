@@ -32,7 +32,7 @@ const ProfilePage = () => {
   // Check if we came from Find Partner page
   const returnToFindPartner = location.state?.from === 'find-partner';
   
-  console.log("🚀 ProfilePage Mount:", {
+  console.log(" ProfilePage Mount:", {
     locationState: location.state,
     from: location.state?.from,
     returnToFindPartner
@@ -193,10 +193,10 @@ const ProfilePage = () => {
   });
 
   return (
-    <div className="bg-base-100 pb-8">
+    <div className="bg-base-100">
       {/* Show banner based on profile completion status */}
       {returnToFindPartner && completionPercentage < 100 && (
-        <div className="bg-info text-info-content px-4 py-3 sm:py-4 text-center text-sm sm:text-base">
+        <div className="bg-info text-info-content px-4 py-3 sm:py-4 text-center text-sm sm:text-base sticky top-0 z-10">
           <p className="font-semibold">Complete your profile to find language partners</p>
           <p className="text-xs sm:text-sm opacity-90 mt-1">
             {completeness?.missingFields?.length || 0} field(s) remaining
@@ -206,7 +206,7 @@ const ProfilePage = () => {
       
       {/* Success banner when profile is complete */}
       {returnToFindPartner && completionPercentage === 100 && (
-        <div className="bg-success text-success-content px-4 py-4 sm:py-5 text-center">
+        <div className="bg-success text-success-content px-4 py-4 sm:py-5 text-center sticky top-0 z-10 shadow-lg">
           <p className="font-bold text-base sm:text-lg mb-2">🎉 Profile Complete!</p>
           <p className="text-xs sm:text-sm mb-3">You're all set to find language partners</p>
           <button 
@@ -219,48 +219,50 @@ const ProfilePage = () => {
       )}
 
       {/* Header with Avatar */}
-      <div className="bg-base-200 px-4 py-6 sm:px-6 sm:py-8 lg:py-10 text-center">
-        <div className="relative inline-block">
-          <Avatar 
-            src={formData.profilePic}
-            alt={formData.fullName}
-            size="2xl"
-            showRing={true}
-          />
-          <button
-            onClick={handleGenerateAvatar}
-            className="btn btn-circle btn-xs sm:btn-sm btn-primary absolute bottom-0 right-0 shadow-lg"
-            disabled={savingField === 'profilePic'}
-          >
-            {savingField === 'profilePic' ? (
-              <Loader className="animate-spin w-3 h-3 sm:w-4 sm:h-4" />
-            ) : (
-              <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
-            )}
-          </button>
-        </div>
-        <p className="text-xs sm:text-sm text-base-content/60 mt-2 px-4 break-all">
-          {authUser?.email}
-        </p>
-        
-        {/* Profile Completion */}
-        <div className="mt-4 max-w-[280px] sm:max-w-xs mx-auto px-4">
-          <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
-            <span className="font-semibold">Profile Completion</span>
-            <span className={`font-bold ${completionPercentage === 100 ? 'text-success' : 'text-warning'}`}>
-              {completionPercentage}%
-            </span>
+      <div className="bg-base-200 px-4 py-6 sm:px-6 sm:py-8 text-center">
+        <div className="max-w-2xl mx-auto">
+          <div className="relative inline-block">
+            <Avatar 
+              src={formData.profilePic}
+              alt={formData.fullName}
+              size="2xl"
+              showRing={true}
+            />
+            <button
+              onClick={handleGenerateAvatar}
+              className="btn btn-circle btn-xs sm:btn-sm btn-primary absolute bottom-0 right-0 shadow-lg"
+              disabled={savingField === 'profilePic'}
+            >
+              {savingField === 'profilePic' ? (
+                <Loader className="animate-spin w-3 h-3 sm:w-4 sm:h-4" />
+              ) : (
+                <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
+              )}
+            </button>
           </div>
-          <progress 
-            className={`progress ${completionPercentage === 100 ? 'progress-success' : 'progress-warning'} w-full h-2`} 
-            value={completionPercentage} 
-            max="100"
-          ></progress>
+          <p className="text-xs sm:text-sm text-base-content/60 mt-2 px-4 break-all">
+            {authUser?.email}
+          </p>
+          
+          {/* Profile Completion */}
+          <div className="mt-4 max-w-[280px] sm:max-w-xs mx-auto">
+            <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+              <span className="font-semibold">Profile Completion</span>
+              <span className={`font-bold ${completionPercentage === 100 ? 'text-success' : 'text-warning'}`}>
+                {completionPercentage}%
+              </span>
+            </div>
+            <progress 
+              className={`progress ${completionPercentage === 100 ? 'progress-success' : 'progress-warning'} w-full h-2`} 
+              value={completionPercentage} 
+              max="100"
+            ></progress>
+          </div>
         </div>
       </div>
 
       {/* Editable Fields */}
-      <div className="w-full max-w-2xl mx-auto px-3 sm:px-4 lg:px-6 py-4 pb-6 space-y-2 sm:space-y-3">
+      <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-8 space-y-3">
         
         {/* Full Name */}
         <EditableField

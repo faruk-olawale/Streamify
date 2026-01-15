@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  @apply bg-base-100;
+}
+
+
+
 
 .str-chat__channel {
   display: flex;
