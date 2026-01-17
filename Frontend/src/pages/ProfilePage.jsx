@@ -32,7 +32,7 @@ const ProfilePage = () => {
   // Check if we came from Find Partner page
   const returnToFindPartner = location.state?.from === 'find-partner';
   
-  console.log(" ProfilePage Mount:", {
+  console.log("🚀 ProfilePage Mount:", {
     locationState: location.state,
     from: location.state?.from,
     returnToFindPartner
@@ -61,17 +61,6 @@ const ProfilePage = () => {
         learningGoals: authUser.learningGoals || [],
         availability: authUser.availability || [],
       });
-    } else {
-      setFormData({
-        fullName: "",
-        bio: "",
-        location: "",
-        profilePic: "",
-        nativeLanguages: "",
-        learningLanguages: "",
-        learningGoals: [],
-        availability: [],
-      });
     }
   }, [authUser]);
 
@@ -83,8 +72,6 @@ const ProfilePage = () => {
       setEditingField(null);
       
       queryClient.setQueryData(["authUser"], (old) => {
-        console.log("📦 Updating cache from:", old?.user);
-        console.log("📦 Updating cache to:", data.user);
         return {
           ...old,
           user: data.user,
@@ -93,7 +80,6 @@ const ProfilePage = () => {
       });
       
       queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      
       toast.success("Saved!", { duration: 1000 });
     },
     onError: (error) => {
@@ -144,16 +130,12 @@ const ProfilePage = () => {
     setFormData({ ...formData, [field]: newArray });
     setSavingField(field);
     
-    console.log(`🔄 Updating ${field}:`, newArray);
-    
     const dataToSend = {
       ...formData,
       [field]: newArray,
       nativeLanguages: formData.nativeLanguages ? [formData.nativeLanguages] : [],
       learningLanguages: formData.learningLanguages ? [formData.learningLanguages] : [],
     };
-    
-    console.log("📤 Sending to backend:", dataToSend);
     
     updateProfileMutation(dataToSend);
   };
@@ -168,18 +150,9 @@ const ProfilePage = () => {
   const completeness = calculateProfileCompleteness(liveUserData);
   const completionPercentage = completeness?.score || 0;
 
-  console.log("📊 Profile completeness:", {
-    authUser: authUser,
-    formData: formData,
-    liveUserData: liveUserData,
-    completeness: completeness,
-    percentage: completionPercentage
-  });
-
-  // Show success message when profile is complete (no auto-redirect)
+  // Show success message when profile is complete
   useEffect(() => {
     if (returnToFindPartner && completionPercentage === 100) {
-      console.log("🎉 Profile complete! Should show success banner");
       toast.success("Profile completed! 🎉", { duration: 3000 });
     }
   }, [completionPercentage, returnToFindPartner]);
@@ -187,40 +160,38 @@ const ProfilePage = () => {
   console.log("🔍 Banner Debug:", {
     returnToFindPartner,
     completionPercentage,
-    locationState: location.state,
-    shouldShowIncompleteBanner: returnToFindPartner && completionPercentage < 100,
     shouldShowSuccessBanner: returnToFindPartner && completionPercentage === 100
   });
 
   return (
-    <div className="bg-base-100">
-      {/* Show banner based on profile completion status */}
-      {returnToFindPartner && completionPercentage < 100 && (
-        <div className="bg-info text-info-content px-4 py-3 sm:py-4 text-center text-sm sm:text-base sticky top-0 z-10">
-          <p className="font-semibold">Complete your profile to find language partners</p>
-          <p className="text-xs sm:text-sm opacity-90 mt-1">
-            {completeness?.missingFields?.length || 0} field(s) remaining
-          </p>
-        </div>
-      )}
-      
-      {/* Success banner when profile is complete */}
-      {returnToFindPartner && completionPercentage === 100 && (
-        <div className="bg-success text-success-content px-4 py-4 sm:py-5 text-center sticky top-0 z-10 shadow-lg">
-          <p className="font-bold text-base sm:text-lg mb-2">🎉 Profile Complete!</p>
-          <p className="text-xs sm:text-sm mb-3">You're all set to find language partners</p>
-          <button 
-            onClick={() => navigate('/find-partner', { replace: true })}
-            className="btn btn-sm sm:btn-md btn-neutral"
-          >
-            Continue to Find Partners
-          </button>
-        </div>
-      )}
+    <div className="w-full bg-base-100">
+      <div className="max-w-4xl mx-auto">
+        {/* Show banner based on profile completion status */}
+        {returnToFindPartner && completionPercentage < 100 && (
+          <div className="bg-info text-info-content px-3 sm:px-4 py-3 sm:py-4 text-center sticky top-0 z-20 shadow-md">
+            <p className="font-semibold text-sm sm:text-base">Complete your profile to find language partners</p>
+            <p className="text-xs sm:text-sm opacity-90 mt-1">
+              {completeness?.missingFields?.length || 0} field(s) remaining
+            </p>
+          </div>
+        )}
+        
+        {/* Success banner when profile is complete */}
+        {returnToFindPartner && completionPercentage === 100 && (
+          <div className="bg-success text-success-content px-3 sm:px-4 py-4 sm:py-5 text-center sticky top-0 z-20 shadow-lg">
+            <p className="font-bold text-base sm:text-lg mb-2">🎉 Profile Complete!</p>
+            <p className="text-xs sm:text-sm mb-3">You're all set to find language partners</p>
+            <button 
+              onClick={() => navigate('/find-partner', { replace: true })}
+              className="btn btn-sm sm:btn-md btn-neutral"
+            >
+              Continue to Find Partners
+            </button>
+          </div>
+        )}
 
-      {/* Header with Avatar */}
-      <div className="bg-base-200 px-4 py-6 sm:px-6 sm:py-8 text-center">
-        <div className="max-w-2xl mx-auto">
+        {/* Header with Avatar */}
+        <div className="bg-base-200 px-3 sm:px-4 py-6 sm:py-8 text-center">
           <div className="relative inline-block">
             <Avatar 
               src={formData.profilePic}
@@ -240,7 +211,7 @@ const ProfilePage = () => {
               )}
             </button>
           </div>
-          <p className="text-xs sm:text-sm text-base-content/60 mt-2 px-4 break-all">
+          <p className="text-xs sm:text-sm text-base-content/60 mt-2 px-2 break-all">
             {authUser?.email}
           </p>
           
@@ -259,168 +230,173 @@ const ProfilePage = () => {
             ></progress>
           </div>
         </div>
-      </div>
 
-      {/* Editable Fields */}
-      <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-8 space-y-3">
-        
-        {/* Full Name */}
-        <EditableField
-          label="Name"
-          value={formData.fullName}
-          field="fullName"
-          editingField={editingField}
-          savingField={savingField}
-          setEditingField={setEditingField}
-          onChange={(value) => setFormData({ ...formData, fullName: value })}
-          onSave={() => handleSaveField('fullName')}
-          type="text"
-          placeholder="Your full name"
-          required
-        />
+        {/* Editable Fields */}
+        <div className="px-3 sm:px-4 py-4 sm:py-6 pb-8 space-y-2 sm:space-y-3">
+          
+          {/* Full Name */}
+          <EditableField
+            label="Name"
+            value={formData.fullName}
+            field="fullName"
+            editingField={editingField}
+            savingField={savingField}
+            setEditingField={setEditingField}
+            setSavingField={setSavingField}
+            onChange={(value) => setFormData({ ...formData, fullName: value })}
+            onSave={() => handleSaveField('fullName')}
+            type="text"
+            placeholder="Your full name"
+            required
+          />
 
-        {/* Bio */}
-        <EditableField
-          label="Bio"
-          value={formData.bio}
-          field="bio"
-          editingField={editingField}
-          savingField={savingField}
-          setEditingField={setEditingField}
-          onChange={(value) => setFormData({ ...formData, bio: value })}
-          onSave={() => handleSaveField('bio')}
-          type="textarea"
-          placeholder="Tell others about yourself..."
-        />
+          {/* Bio */}
+          <EditableField
+            label="Bio"
+            value={formData.bio}
+            field="bio"
+            editingField={editingField}
+            savingField={savingField}
+            setEditingField={setEditingField}
+            setSavingField={setSavingField}
+            onChange={(value) => setFormData({ ...formData, bio: value })}
+            onSave={() => handleSaveField('bio')}
+            type="textarea"
+            placeholder="Tell others about yourself..."
+          />
 
-        {/* Location */}
-        <EditableField
-          label="Location"
-          value={formData.location}
-          field="location"
-          editingField={editingField}
-          savingField={savingField}
-          setEditingField={setEditingField}
-          onChange={(value) => setFormData({ ...formData, location: value })}
-          onSave={() => handleSaveField('location')}
-          type="text"
-          placeholder="City, Country"
-          icon={<MapPin className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />}
-        />
+          {/* Location */}
+          <EditableField
+            label="Location"
+            value={formData.location}
+            field="location"
+            editingField={editingField}
+            savingField={savingField}
+            setEditingField={setEditingField}
+            setSavingField={setSavingField}
+            onChange={(value) => setFormData({ ...formData, location: value })}
+            onSave={() => handleSaveField('location')}
+            type="text"
+            placeholder="City, Country"
+            icon={<MapPin className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />}
+          />
 
-        {/* Native Language */}
-        <EditableField
-          label="Native Language"
-          value={formData.nativeLanguages}
-          field="nativeLanguages"
-          editingField={editingField}
-          savingField={savingField}
-          setEditingField={setEditingField}
-          onChange={(value) => setFormData({ ...formData, nativeLanguages: value })}
-          onSave={() => handleSaveField('nativeLanguages')}
-          type="select"
-          options={LANGUAGES}
-          placeholder="Select language"
-        />
+          {/* Native Language */}
+          <EditableField
+            label="Native Language"
+            value={formData.nativeLanguages}
+            field="nativeLanguages"
+            editingField={editingField}
+            savingField={savingField}
+            setEditingField={setEditingField}
+            setSavingField={setSavingField}
+            onChange={(value) => setFormData({ ...formData, nativeLanguages: value })}
+            onSave={() => handleSaveField('nativeLanguages')}
+            type="select"
+            options={LANGUAGES}
+            placeholder="Select language"
+          />
 
-        {/* Learning Language */}
-        <EditableField
-          label="Learning Language"
-          value={formData.learningLanguages}
-          field="learningLanguages"
-          editingField={editingField}
-          savingField={savingField}
-          setEditingField={setEditingField}
-          onChange={(value) => setFormData({ ...formData, learningLanguages: value })}
-          onSave={() => handleSaveField('learningLanguages')}
-          type="select"
-          options={LANGUAGES}
-          placeholder="Select language"
-        />
+          {/* Learning Language */}
+          <EditableField
+            label="Learning Language"
+            value={formData.learningLanguages}
+            field="learningLanguages"
+            editingField={editingField}
+            savingField={savingField}
+            setEditingField={setEditingField}
+            setSavingField={setSavingField}
+            onChange={(value) => setFormData({ ...formData, learningLanguages: value })}
+            onSave={() => handleSaveField('learningLanguages')}
+            type="select"
+            options={LANGUAGES}
+            placeholder="Select language"
+          />
 
-        {/* Learning Goals */}
-        <div className="card bg-base-200">
-          <div className="card-body p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
-                <Target className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                Learning Goals
-              </h3>
-              {savingField === 'learningGoals' && (
-                <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {LEARNING_GOALS.map(goal => (
-                <button
-                  key={goal}
-                  onClick={() => toggleArrayItem('learningGoals', goal)}
-                  className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
-                    formData.learningGoals?.includes(goal)
-                      ? 'badge-primary'
-                      : 'badge-outline hover:badge-primary'
-                  }`}
-                >
-                  {goal}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Availability */}
-        <div className="card bg-base-200">
-          <div className="card-body p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
-                <Clock className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                Availability
-              </h3>
-              {savingField === 'availability' && (
-                <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {AVAILABILITY_OPTIONS.map(time => (
-                <button
-                  key={time}
-                  onClick={() => toggleArrayItem('availability', time)}
-                  className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
-                    formData.availability?.includes(time)
-                      ? 'badge-accent'
-                      : 'badge-outline hover:badge-accent'
-                  }`}
-                >
-                  {time}
-                </button>
-              ))}
+          {/* Learning Goals */}
+          <div className="card bg-base-200">
+            <div className="card-body p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                  <Target className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  Learning Goals
+                </h3>
+                {savingField === 'learningGoals' && (
+                  <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {LEARNING_GOALS.map(goal => (
+                  <button
+                    key={goal}
+                    onClick={() => toggleArrayItem('learningGoals', goal)}
+                    className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
+                      formData.learningGoals?.includes(goal)
+                        ? 'badge-primary'
+                        : 'badge-outline hover:badge-primary'
+                    }`}
+                  >
+                    {goal}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Settings Section */}
-        <div className="divider mt-6 sm:mt-8 text-sm sm:text-base">Settings</div>
-
-        {/* Theme */}
-        <div className="card bg-base-200">
-          <div className="card-body p-3 sm:p-4 flex flex-row items-center justify-between">
-            <span className="font-medium text-sm sm:text-base">Theme</span>
-            <ThemeSelector />
+          {/* Availability */}
+          <div className="card bg-base-200">
+            <div className="card-body p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                  <Clock className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  Availability
+                </h3>
+                {savingField === 'availability' && (
+                  <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {AVAILABILITY_OPTIONS.map(time => (
+                  <button
+                    key={time}
+                    onClick={() => toggleArrayItem('availability', time)}
+                    className={`badge badge-md sm:badge-lg cursor-pointer transition-all text-xs sm:text-sm ${
+                      formData.availability?.includes(time)
+                        ? 'badge-accent'
+                        : 'badge-outline hover:badge-accent'
+                    }`}
+                  >
+                    {time}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Logout */}
-        <button
-          onClick={() => {
-            if (confirm("Are you sure you want to logout?")) {
-              logoutMutation();
-            }
-          }}
-          className="btn btn-error btn-block gap-2 text-sm sm:text-base h-12 sm:h-auto min-h-[48px]"
-        >
-          <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-          Logout
-        </button>
+          {/* Settings Section */}
+          <div className="divider mt-4 sm:mt-6 text-sm sm:text-base">Settings</div>
+
+          {/* Theme */}
+          <div className="card bg-base-200">
+            <div className="card-body p-3 sm:p-4 flex flex-row items-center justify-between">
+              <span className="font-medium text-sm sm:text-base">Theme</span>
+              <ThemeSelector />
+            </div>
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to logout?")) {
+                logoutMutation();
+              }
+            }}
+            className="btn btn-error btn-block gap-2 text-sm sm:text-base h-12 sm:h-auto min-h-[48px]"
+          >
+            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -434,6 +410,7 @@ function EditableField({
   editingField,
   savingField,
   setEditingField,
+  setSavingField,
   onChange,
   onSave,
   type = "text",

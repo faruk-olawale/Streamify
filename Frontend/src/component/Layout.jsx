@@ -6,30 +6,26 @@ import BottomNav from "./BottomNav";
 const Layout = ({ children, showSidebar = false }) => {
   const location = useLocation();
 
-  // Hide Navbar on Groups pages
   const hideNavbar = location.pathname.startsWith("/groups");
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex flex-1">
+    <div className="flex flex-col h-screen">
+      <div className="flex flex-1 overflow-hidden">
         {showSidebar && <Sidebar />}
 
-        <div className="flex-1 flex flex-col">
-          {/* Top Navbar (hidden on Groups pages) */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {!hideNavbar && <Navbar />}
 
-          {/* Page Content */}
           <main
-            className={`flex-1 overflow-auto ${
-              !hideNavbar ? "pt-16 lg:pt-16" : ""
-            }`}
+            className={`overflow-auto ${
+              !hideNavbar ? "pt-16" : ""
+            } pb-16`}
           >
             {children}
           </main>
         </div>
       </div>
 
-      {/* Bottom Navigation */}
       <BottomNav />
     </div>
   );
