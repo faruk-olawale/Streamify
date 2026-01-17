@@ -374,7 +374,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Settings Section */}
-          <div className="divider mt-4 sm:mt-6 text-sm sm:text-base">Settings</div>
+          {/* <div className="divider mt-4 sm:mt-6 text-sm sm:text-base">Settings</div> */}
 
           {/* Theme */}
           <div className="card bg-base-200">
