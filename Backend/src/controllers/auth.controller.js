@@ -238,3 +238,85 @@ export async function onboard(req, res) {
     });
   }
 }
+
+
+
+
+export async function onboarding(req, res) {
+  try {
+    const userId = req.user._id;
+    const { 
+      bio, 
+      location, 
+      nativeLanguages, 
+      learningLanguages,
+      proficiencyLevels,    // NEW
+      learningGoals,        // ENHANCED
+      availability 
+    } = req.body;
+
+    console.log("📝 Onboarding data received:", {
+      userId,
+      bio,
+      location,
+      nativeLanguages,
+      learningLanguages,
+      proficiencyLevels,
+      learningGoals,
+      availability
+    });
+
+    // Build update object
+    const updateData = {
+      isOnboarded: true,
+      lastActive: new Date()  // Mark as active
+    };
+
+    if (bio !== undefined) updateData.bio = bio;
+    if (location !== undefined) updateData.location = location;
+    if (nativeLanguages !== undefined) updateData.nativeLanguages = nativeLanguages;
+    if (learningLanguages !== undefined) updateData.learningLanguages = learningLanguages;
+    if (availability !== undefined) updateData.availability = availability;
+    
+    // NEW: Handle proficiency levels
+    if (proficiencyLevels !== undefined) {
+      updateData.proficiencyLevels = proficiencyLevels;
+    }
+    
+    // ENHANCED: Handle detailed learning goals
+    if (learningGoals !== undefined) {
+      updateData.learningGoals = learningGoals;
+    }
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ User onboarded successfully:", {
+      userId: updatedUser._id,
+      isOnboarded: updatedUser.isOnboarded,
+      proficiencyLevels: updatedUser.proficiencyLevels,
+      learningGoals: updatedUser.learningGoals
+    });
+
+    res.status(200).json({
+      success: true,
+      user: updatedUser,
+      message: "Onboarding completed successfully"
+    });
+
+  } catch (error) {
+    console.error("❌ Error in onboarding:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error",
+      error: error.message 
+    });
+  }
+}

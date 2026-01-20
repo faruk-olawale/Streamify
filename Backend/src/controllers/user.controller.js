@@ -1,23 +1,32 @@
 import FriendRequest from "../models/FriendRequest.js";
 import User from "../models/User.js";
 import { upsertStreamUser } from "../lib/stream.js";
-
+import { sortByMatchScore, filterByPreferences } from "../utils/matchScoring.js";
 
 /**
- * Get recommended users (exclude self and friends)
+ * Get recommended users with match scoring
+ * NOW WITH: Match percentage, reasons, and intelligent sorting
  */
 export const getRecommendedUsers = async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
 
-    const recommendedUsers = await User.find({
+    // Fetch potential matches
+    let recommendedUsers = await User.find({
       _id: { $nin: [currentUser._id, ...currentUser.friends] },
       isOnboarded: true,
     }).select(
-      "fullName profilePic bio nativeLanguages learningLanguages location"
+      "fullName profilePic bio nativeLanguages learningLanguages location proficiencyLevels learningGoals lastActive"
     );
 
-    res.status(200).json(recommendedUsers);
+    // Apply user preferences (if any)
+    recommendedUsers = filterByPreferences(recommendedUsers, currentUser);
+
+    // Calculate match scores and sort
+    const scoredUsers = sortByMatchScore(recommendedUsers, currentUser);
+
+    // Return top matches (you can add pagination here)
+    res.status(200).json(scoredUsers);
   } catch (err) {
     console.error("getRecommendedUsers error:", err.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -31,7 +40,7 @@ export const getMyFriends = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate(
       "friends",
-      "fullName profilePic bio nativeLanguages learningLanguages location"
+      "fullName profilePic bio nativeLanguages learningLanguages location proficiencyLevels learningGoals"
     );
     res.status(200).json(user.friends || []);
   } catch (err) {
@@ -124,11 +133,9 @@ export const acceptFriendRequest = async (req, res) => {
 
 /**
  * Get incoming friend requests and accepted requests notifications
- * Returns: { incomingReqs: [], acceptedReqs: [] }
  */
 export const getFriendRequests = async (req, res) => {
   try {
-    // Get incoming pending requests (where current user is recipient)
     const incomingReqs = await FriendRequest.find({
       recipient: req.user.id,
       status: "pending",
@@ -137,8 +144,6 @@ export const getFriendRequests = async (req, res) => {
       "fullName profilePic bio nativeLanguages learningLanguages location"
     );
 
-    // Get accepted requests where current user was the sender
-    // These are notifications that someone accepted your friend request
     const acceptedReqs = await FriendRequest.find({
       sender: req.user.id,
       status: "accepted",
@@ -157,39 +162,28 @@ export const getFriendRequests = async (req, res) => {
   }
 };
 
-
-// ... existing functions
-
-// Mark friend notifications as read
+/**
+ * Mark friend notifications as read
+ */
 export const markFriendNotificationsRead = async (req, res) => {
   try {
     const userId = req.user._id;
     const { requestIds, type } = req.body;
 
-    console.log("=== MARK FRIEND NOTIFICATIONS READ ===");
-    console.log("User ID:", userId);
-    console.log("Request IDs:", requestIds);
-    console.log("Type:", type);
-
     if (requestIds && Array.isArray(requestIds) && requestIds.length > 0) {
-      // Mark specific requests as read
       if (type === "accepted") {
-        // For accepted notifications (new connections)
         await FriendRequest.updateMany(
           { _id: { $in: requestIds }, status: 'accepted' },
           { read: true }
         );
       } else {
-        // For incoming requests or any other
         await FriendRequest.updateMany(
           { _id: { $in: requestIds } },
           { read: true }
         );
       }
-      console.log(`✓ Marked ${requestIds.length} friend notifications as read`);
     } else {
-      // Mark all unread notifications for this user
-      const result = await FriendRequest.updateMany(
+      await FriendRequest.updateMany(
         { 
           $or: [
             { recipient: userId, read: false },
@@ -198,7 +192,6 @@ export const markFriendNotificationsRead = async (req, res) => {
         },
         { read: true }
       );
-      console.log(`✓ Marked all ${result.modifiedCount} friend notifications as read`);
     }
 
     res.status(200).json({ message: "Notifications marked as read" });
@@ -208,8 +201,9 @@ export const markFriendNotificationsRead = async (req, res) => {
   }
 };
 
-
-
+/**
+ * Update user profile - ENHANCED with new fields
+ */
 export async function updateProfile(req, res) {
   try {
     const userId = req.user._id;
@@ -221,15 +215,10 @@ export async function updateProfile(req, res) {
       nativeLanguages, 
       learningLanguages,
       learningGoals,
-      availability 
-    } = req.body;
-
-    console.log("📥 Update profile request:", {
-      userId,
-      learningGoals,
       availability,
-      fullBody: req.body
-    });
+      proficiencyLevels,
+      matchPreferences
+    } = req.body;
 
     // Build update object
     const updateData = {};
@@ -241,8 +230,8 @@ export async function updateProfile(req, res) {
     if (learningLanguages !== undefined) updateData.learningLanguages = learningLanguages;
     if (learningGoals !== undefined) updateData.learningGoals = learningGoals;
     if (availability !== undefined) updateData.availability = availability;
-
-    console.log("💾 Saving to database:", updateData);
+    if (proficiencyLevels !== undefined) updateData.proficiencyLevels = proficiencyLevels;
+    if (matchPreferences !== undefined) updateData.matchPreferences = matchPreferences;
 
     // Update user in database
     const updatedUser = await User.findByIdAndUpdate(
@@ -254,11 +243,6 @@ export async function updateProfile(req, res) {
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    console.log("✅ User updated successfully:", {
-      learningGoals: updatedUser.learningGoals,
-      availability: updatedUser.availability
-    });
 
     // Sync with Stream if name or pic changed
     if (fullName !== undefined || profilePic !== undefined) {
