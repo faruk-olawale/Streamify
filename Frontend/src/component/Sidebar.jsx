@@ -65,7 +65,9 @@ const Sidebar = () => {
         </nav>
 
         {/* USER PROFILE SECTION */}
-        <div className='p-4 border-t border-base-300 mt-auto'>
+        <Link
+        to="/profile"
+        className='p-4 border-t border-base-300 mt-auto'>
             <div className='flex items-center gap-3'>
                 <div className='avatar'>
                     <div className='w-10 h-10 rounded-full'>
@@ -86,7 +88,7 @@ const Sidebar = () => {
                     </p>
                 </div>
             </div>
-        </div>
+        </Link>
     </aside>
   )
 }

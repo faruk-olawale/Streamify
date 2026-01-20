@@ -123,7 +123,9 @@ const Navbar = () => {
             </Link>
 
             {/* Avatar - Desktop only */}
-            <div className="avatar hidden lg:block">
+            <Link
+              to="/profile"
+               className="avatar hidden lg:block">
               <div className="w-9 rounded-full">
                 <img
                   src={authUser?.profilePic}
@@ -135,7 +137,7 @@ const Navbar = () => {
                   }}
                 />
               </div>
-            </div>
+            </Link>
 
             {/* Theme Selector - Desktop only */}
             <div className="hidden lg:block">
