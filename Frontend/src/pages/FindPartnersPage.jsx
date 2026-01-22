@@ -1,351 +1,300 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getRecommendedPartners, sendFriendReqests } from "../lib/api";
-import { Sparkles, RefreshCw, UserPlus, CheckCircle, Zap, ArrowLeft, AlertCircle, Edit } from "lucide-react";
-import Avatar from "../component/Avatar";
-import toast from "react-hot-toast";
-import { useNavigate } from "react-router";
-import useAuthUser from "../hooks/useAuthUser";
-import { getRequiredFieldsForMatching } from "../utils/profileHelper";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import {
+  getRecommendedUsers,
+  getOutgoingFriendsReqs,
+  sendFriendReqests,
+} from "../lib/api";
+import { Sparkles, Filter, Search, Users } from "lucide-react";
+import FriendCard from "../component/FriendCard";
+import { LANGUAGES } from "../constants";
 
 const FindPartnersPage = () => {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { authUser } = useAuthUser();
-  const [sentRequests, setSentRequests] = useState(new Set());
-
-  // Check profile completeness
-  const missingFields = getRequiredFieldsForMatching(authUser || {});
-  const isProfileComplete = missingFields.length === 0;
-
-  const { data: matchesData, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["recommended-partners"],
-    queryFn: () => getRecommendedPartners(),
-    enabled: isProfileComplete, // Only fetch if profile is complete
-    onSuccess: (data) => {
-      console.log("✅ Matches loaded:", data);
-    },
-    onError: (error) => {
-      console.error("❌ Error loading matches:", error);
-    }
+  const [outgoingRequestIds, setOutgoingRequestIds] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    language: "",
+    minMatchScore: 0,
+    onlineOnly: false,
   });
 
-  const { mutate: sendRequestMutation } = useMutation({
+  /* =======================
+     QUERIES
+  ======================= */
+  const { data: recommendedUsers = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ["users"],
+    queryFn: getRecommendedUsers,
+  });
+
+  const { data: outgoingFriendsReqs } = useQuery({
+    queryKey: ["outgoingFriendsReqs"],
+    queryFn: getOutgoingFriendsReqs,
+  });
+
+  /* =======================
+     MUTATION
+  ======================= */
+  const { mutateAsync: sendRequestMutation } = useMutation({
     mutationFn: sendFriendReqests,
-    onSuccess: (_, userId) => {
-      toast.success("Friend request sent!");
-      setSentRequests(prev => new Set([...prev, userId]));
-      queryClient.invalidateQueries({ queryKey: ["outgoingFriendsReqs"] });
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to send request");
-    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["outgoingFriendsReqs"] }),
   });
 
-  const matches = matchesData?.matches || [];
+  /* =======================
+     TRACK OUTGOING REQUESTS
+  ======================= */
+  useEffect(() => {
+    const ids = new Set();
+    outgoingFriendsReqs?.forEach((req) => ids.add(req.recipient._id));
+    setOutgoingRequestIds(ids);
+  }, [outgoingFriendsReqs]);
 
-  console.log("📊 FindPartnersPage Debug:", {
-    isLoading,
-    isError,
-    error: error?.message,
-    matchesData,
-    matchesCount: matches.length
+  /* =======================
+     FILTERING LOGIC
+  ======================= */
+  const filteredUsers = recommendedUsers.filter((user) => {
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesName = user.fullName?.toLowerCase().includes(query);
+      const matchesBio = user.bio?.toLowerCase().includes(query);
+      const matchesLocation = user.location?.toLowerCase().includes(query);
+      
+      if (!matchesName && !matchesBio && !matchesLocation) {
+        return false;
+      }
+    }
+
+    // Language filter
+    if (filters.language) {
+      const hasLanguage = 
+        user.nativeLanguages?.includes(filters.language) ||
+        user.learningLanguages?.includes(filters.language);
+      
+      if (!hasLanguage) return false;
+    }
+
+    // Match score filter
+    if (filters.minMatchScore > 0) {
+      if (!user.matchScore || user.matchScore < filters.minMatchScore) {
+        return false;
+      }
+    }
+
+    // Online filter (placeholder - implement real online status)
+    if (filters.onlineOnly) {
+      // TODO: Check real online status
+      // For now, randomly filter for demo
+      if (Math.random() > 0.3) return false;
+    }
+
+    return true;
   });
 
-  const getScoreColor = (score) => {
-    if (score >= 80) return "text-success";
-    if (score >= 60) return "text-warning";
-    return "text-info";
-  };
+  const hasActiveFilters = 
+    filters.language || 
+    filters.minMatchScore > 0 || 
+    filters.onlineOnly || 
+    searchQuery;
 
-  const getScoreBadgeClass = (score) => {
-    if (score >= 80) return "badge-success";
-    if (score >= 60) return "badge-warning";
-    return "badge-info";
-  };
-
-  const getScoreLabel = (score) => {
-    if (score >= 80) return "Excellent";
-    if (score >= 60) return "Good";
-    if (score >= 40) return "Fair";
-    return "Low";
-  };
-
-  const getScoreDescription = (score) => {
-    if (score >= 80) return "Highly compatible - Perfect practice partner!";
-    if (score >= 60) return "Good match - Compatible in most areas";
-    if (score >= 40) return "Fair match - Some compatibility";
-    return "Limited compatibility";
+  const clearFilters = () => {
+    setFilters({
+      language: "",
+      minMatchScore: 0,
+      onlineOnly: false,
+    });
+    setSearchQuery("");
   };
 
   return (
-    <div className="min-h-screen bg-base-100 pb-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-primary to-secondary p-4 sm:p-6 text-primary-content">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Back Button - Always Visible */}
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-ghost btn-sm sm:btn-md btn-circle flex-shrink-0"
-              aria-label="Back to home"
-            >
-              <ArrowLeft size={20} className="sm:w-6 sm:h-6" />
-            </button>
+    <div className="min-h-screen bg-base-100 px-4 sm:px-6 lg:px-8 py-6">
+      <div className="container mx-auto space-y-6">
 
-            {/* Title Section */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
-                <Sparkles size={24} className="sm:w-8 sm:h-8 flex-shrink-0" />
-                <span className="truncate">Find Practice Partners</span>
+        {/* =======================
+           HEADER
+        ======================= */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            {/* <Link 
+              to="/" 
+              className="btn btn-ghost btn-circle"
+              title="Back to home"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            </Link> */}
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                <Sparkles className="text-primary" size={32} />
+                Find Language Partners
               </h1>
-              <p className="mt-1 sm:mt-2 text-xs sm:text-base opacity-90 hidden sm:block">
-                Smart matches based on your learning goals and availability
+              <p className="text-sm opacity-70 mt-1">
+                Discover {recommendedUsers.length} learners matched to your profile
               </p>
             </div>
+          </div>
 
-            {/* Refresh Button */}
+          {/* Search Bar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-5 opacity-50" />
+              <input
+                type="text"
+                placeholder="Search by name, bio, or location..."
+                className="input input-bordered w-full pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             <button
-              onClick={() => refetch()}
-              className="btn btn-ghost btn-sm sm:btn-md gap-2 flex-shrink-0"
-              disabled={isLoading}
+              onClick={() => setShowFilters(!showFilters)}
+              className={`btn ${hasActiveFilters ? 'btn-primary' : 'btn-outline'}`}
             >
-              <RefreshCw size={16} className={`sm:w-[18px] sm:h-[18px] ${isLoading ? "animate-spin" : ""}`} />
-              <span className="hidden md:inline">Refresh</span>
+              <Filter className="size-5" />
+              Filters
+              {hasActiveFilters && (
+                <span className="badge badge-sm">
+                  {[filters.language, filters.minMatchScore > 0, filters.onlineOnly, searchQuery].filter(Boolean).length}
+                </span>
+              )}
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Profile Incomplete Warning */}
-        {!isProfileComplete && (
-          <div className="alert alert-warning mb-6">
-            <AlertCircle size={24} />
-            <div className="flex-1">
-              <h3 className="font-bold">Complete Your Profile to Find Matches</h3>
-              <div className="text-sm mt-2">
-                <p className="mb-2">We need a few more details to find your perfect practice partners:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  {missingFields.map((field, idx) => (
-                    <li key={idx}>
-                      <strong>{field.field}</strong> - {field.reason}
-                    </li>
-                  ))}
-                </ul>
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="card bg-base-200">
+              <div className="card-body p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  
+                  {/* Language Filter */}
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">Language</span>
+                    </label>
+                    <select
+                      className="select select-bordered select-sm"
+                      value={filters.language}
+                      onChange={(e) => setFilters({ ...filters, language: e.target.value })}
+                    >
+                      <option value="">All Languages</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Match Score Filter */}
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">Min Match Score</span>
+                    </label>
+                    <select
+                      className="select select-bordered select-sm"
+                      value={filters.minMatchScore}
+                      onChange={(e) => setFilters({ ...filters, minMatchScore: Number(e.target.value) })}
+                    >
+                      <option value="0">Any Score</option>
+                      <option value="80">Excellent (80%+)</option>
+                      <option value="60">Great (60%+)</option>
+                      <option value="40">Good (40%+)</option>
+                    </select>
+                  </div>
+
+                  {/* Online Only */}
+                  <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={filters.onlineOnly}
+                        onChange={(e) => setFilters({ ...filters, onlineOnly: e.target.checked })}
+                      />
+                      <span className="label-text">Show online only</span>
+                    </label>
+                  </div>
+                </div>
+
+                {hasActiveFilters && (
+                  <div className="flex justify-end mt-2">
+                    <button onClick={clearFilters} className="btn btn-ghost btn-sm">
+                      Clear Filters
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-            {/* UPDATED: Pass navigation state */}
-            <button 
-              onClick={() => navigate('/profile', { state: { from: 'find-partner' } })}
-              className="btn btn-sm btn-primary gap-2"
-            >
-              <Edit size={16} />
-              Complete Profile
-            </button>
+          )}
+
+          {/* Results Count */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="opacity-70">
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'match' : 'matches'} found
+            </span>
+            
+            {hasActiveFilters && (
+              <span className="text-primary font-medium">
+                Filters active
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* =======================
+           RESULTS GRID
+        ======================= */}
+        {loadingUsers ? (
+          <div className="flex justify-center py-12">
+            <span className="loading loading-spinner loading-lg" />
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="card bg-base-200 p-8 text-center">
+            <Users className="size-16 mx-auto mb-4 text-primary opacity-50" />
+            <h3 className="font-semibold text-lg mb-2">
+              {hasActiveFilters ? 'No matches found' : 'No recommendations yet'}
+            </h3>
+            <p className="opacity-70 mb-4">
+              {hasActiveFilters 
+                ? 'Try adjusting your filters or search query'
+                : 'Complete your profile to get personalized matches'
+              }
+            </p>
+            {hasActiveFilters ? (
+              <button onClick={clearFilters} className="btn btn-primary btn-sm mx-auto">
+                Clear Filters
+              </button>
+            ) : (
+              <a href="/profile" className="btn btn-primary btn-sm mx-auto">
+                Complete Profile
+              </a>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredUsers.map((user) => (
+              <FriendCard
+                key={user._id}
+                friend={user}
+                sendRequest={sendRequestMutation}
+                isRequestSent={outgoingRequestIds.has(user._id)}
+                isFriend={false}
+              />
+            ))}
           </div>
         )}
 
-        {isProfileComplete && (
-          <>
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <span className="loading loading-spinner loading-lg"></span>
-              </div>
-            ) : matches.length === 0 ? (
-              <div className="text-center py-12">
-                <Sparkles size={64} className="mx-auto text-base-content/30 mb-4" />
-                <h3 className="text-xl font-bold mb-2">No matches found yet</h3>
-                <p className="text-base-content/70 mb-4">
-                  Try updating your profile or check back later for new matches
-                </p>
-                <button 
-                  onClick={() => navigate('/profile')}
-                  className="btn btn-primary"
-                >
-                  Update Profile
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold mb-2">
-                    Your Top Matches ({matches.length})
-                  </h2>
-                  <p className="text-base-content/70">
-                    These partners are highly compatible with your learning goals
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {matches.map((match) => {
-                    const user = match.user;
-                    const isRequestSent = sentRequests.has(user._id);
-
-                    return (
-                      <div
-                        key={user._id}
-                        className="card bg-base-200 hover:shadow-lg transition-all"
-                      >
-                        <div className="card-body p-4">
-                          {/* Match Score Badge with Details */}
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <div 
-                                className={`badge badge-lg gap-2 ${getScoreBadgeClass(match.overallScore)}`}
-                              >
-                                <Zap size={14} />
-                                {match.overallScore}% {getScoreLabel(match.overallScore)}
-                              </div>
-                            </div>
-                            <p className="text-xs text-base-content/60">
-                              {getScoreDescription(match.overallScore)}
-                            </p>
-                          </div>
-
-                          {/* User Info */}
-                          <div className="flex items-center gap-3 mb-3">
-                            <Avatar
-                              src={user.profilePic}
-                              alt={user.fullName}
-                              size="lg"
-                              showRing={false}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-lg truncate">
-                                {user.fullName}
-                              </h3>
-                              {user.location && (
-                                <p className="text-sm text-base-content/60 truncate">
-                                  {user.location}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Bio */}
-                          {user.bio && (
-                            <p className="text-sm text-base-content/70 mb-3 line-clamp-2">
-                              {user.bio}
-                            </p>
-                          )}
-
-                          {/* Languages */}
-                          <div className="space-y-2 mb-3">
-                            {user.nativeLanguages && user.nativeLanguages.length > 0 && (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold">Speaks:</span>
-                                {user.nativeLanguages.map(lang => (
-                                  <span key={lang} className="badge badge-secondary badge-sm">
-                                    {lang}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {user.learningLanguages && user.learningLanguages.length > 0 && (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold">Learning:</span>
-                                {user.learningLanguages.map(lang => (
-                                  <span key={lang} className="badge badge-outline badge-sm">
-                                    {lang}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Match Reasons - Enhanced */}
-                          {match.reasons && match.reasons.length > 0 && (
-                            <div className="bg-base-300/50 rounded-lg p-3 mb-3">
-                              <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-primary">
-                                <Sparkles size={14} />
-                                Why {match.overallScore >= 80 ? "you're a great match" : "this might work"}:
-                              </p>
-                              <ul className="text-xs space-y-1.5">
-                                {match.reasons.map((reason, idx) => (
-                                  <li key={idx} className="flex items-start gap-2">
-                                    <span className="text-success mt-0.5">✓</span>
-                                    <span className="flex-1">{reason}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                              
-                              {/* Score Breakdown */}
-                              {match.scoreBreakdown && (
-                                <div className="mt-3 pt-3 border-t border-base-content/10">
-                                  <p className="text-xs font-semibold mb-2">Match Details:</p>
-                                  <div className="grid grid-cols-2 gap-2 text-xs">
-                                    {match.scoreBreakdown.languageCompatibility >= 70 && (
-                                      <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-success"></div>
-                                        <span>Language: {Math.round(match.scoreBreakdown.languageCompatibility)}%</span>
-                                      </div>
-                                    )}
-                                    {match.scoreBreakdown.availabilityMatch >= 50 && (
-                                      <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-info"></div>
-                                        <span>Schedule: {Math.round(match.scoreBreakdown.availabilityMatch)}%</span>
-                                      </div>
-                                    )}
-                                    {match.scoreBreakdown.goalsAlignment >= 50 && (
-                                      <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-warning"></div>
-                                        <span>Goals: {Math.round(match.scoreBreakdown.goalsAlignment)}%</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Goals */}
-                          {user.learningGoals && user.learningGoals.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-3">
-                              {user.learningGoals.slice(0, 3).map(goal => (
-                                <span key={goal} className="badge badge-xs badge-ghost">
-                                  {goal}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Availability */}
-                          {user.availability && user.availability.length > 0 && (
-                            <div className="text-xs text-base-content/60 mb-3">
-                              Available: {user.availability.slice(0, 2).join(", ")}
-                            </div>
-                          )}
-
-                          {/* Action Button */}
-                          <button
-                            onClick={() => sendRequestMutation(user._id)}
-                            disabled={isRequestSent}
-                            className={`btn w-full ${
-                              isRequestSent ? "btn-disabled" : "btn-primary"
-                            }`}
-                          >
-                            {isRequestSent ? (
-                              <>
-                                <CheckCircle size={18} />
-                                Request Sent
-                              </>
-                            ) : (
-                              <>
-                                <UserPlus size={18} />
-                                Send Request
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </>
+        {/* Load More (Future Enhancement) */}
+        {filteredUsers.length >= 20 && (
+          <div className="text-center py-8">
+            <button className="btn btn-outline">
+              Load More
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -17,7 +17,7 @@ import GroupsPage from "./pages/GroupsPage.jsx";
 import GroupChatPage from "./pages/GroupChatPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import FindPartnersPage from "./pages/FindPartnersPage";
-
+import PracticePage from "./pages/PracticePage.jsx";
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
   const { theme } = useThemeStore();
@@ -157,6 +157,8 @@ const App = () => {
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
+        <Route path="/practice" element={<PracticePage />} />
       </Routes>
     </div>
   );
