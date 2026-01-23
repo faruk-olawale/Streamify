@@ -226,3 +226,14 @@ export const getPracticeStats = async () => {
      const res = await axios.get("/api/practice/stats");
      return res.data;
    };
+
+
+export const recordPractice = async (data) => {
+  const res = await axios.post("/api/practice/record", data);
+  return res.data;
+};
+
+export const getPracticeStats = async () => {
+  const res = await axios.get("/api/practice/stats");
+  return res.data;
+};   
