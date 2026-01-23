@@ -233,7 +233,3 @@ export const recordPractice = async (data) => {
   return res.data;
 };
 
-export const getPracticeStats = async () => {
-  const res = await axios.get("/api/practice/stats");
-  return res.data;
-};   
