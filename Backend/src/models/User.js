@@ -104,12 +104,32 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    
     friends:[
         {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
         }
-    ]
+    ],
+
+    // STREAK SYSTEM: Practice tracking fields
+    practiceHistory: [{
+        date: { type: Date, required: true },
+        minutesPracticed: { type: Number, default: 0 },
+        activities: [{
+            type: { type: String, enum: ['chat', 'video', 'group'] },
+            partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            duration: Number,
+            timestamp: { type: Date, default: Date.now }
+        }]
+    }],
+    
+    currentStreak: { type: Number, default: 0 },
+    longestStreak: { type: Number, default: 0 },
+    lastPracticeDate: { type: Date },
+    
+    dailyGoal: { type: Number, default: 30 }, // minutes
+    todaysPracticeMinutes: { type: Number, default: 0 }
 
 }, {timestamps: true});
 

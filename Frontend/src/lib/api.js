@@ -221,3 +221,8 @@ export async function refreshMatches() {
   const res = await axiosInstance.post("/matching/refresh");
   return res.data;
 }
+
+export const getPracticeStats = async () => {
+     const res = await axios.get("/api/practice/stats");
+     return res.data;
+   };

@@ -10,6 +10,7 @@ import chatRoutes from "./routes/chat.route.js";
 import groupRoutes from "./routes/group.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 import matchingRoutes from "./routes/matching.route.js";
+import practiceRoutes from "./routes/practiceRoutes.js";
 
 
 import { connectDB } from "./lib/db.js";
@@ -34,6 +35,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/matching", matchingRoutes);
+app.use("/api/practice", practiceRoutes);
 
 // Log all registered routes
 console.log("=== REGISTERED ROUTES ===");
