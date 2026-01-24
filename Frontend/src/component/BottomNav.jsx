@@ -32,7 +32,7 @@ const BottomNav = () => {
         </Link>
 
         <Link
-          to="/friends"
+          to="/messages"
           className={`flex items-center justify-center w-16 h-12 rounded-lg ${
             isActive("/friends") ? "text-primary" : "text-base-content/60"
           }`}
