@@ -1,44 +1,49 @@
-import { useEffect, useState, useRef } from "react"
-import { useParams } from "react-router"
-import useAuthUser from "../hooks/useAuthUser";
+import { useEffect, useRef, useState } from "react";
+import { useParams, Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getStreamToken, recordPractice, getUserFriends } from "../lib/api";
-
-import {
-  Channel,
-  Chat,
-  MessageInput,
-  MessageList,
-  Thread,
-  Window,
-} from "stream-chat-react"
-
 import { StreamChat } from "stream-chat";
+import {
+  Chat,
+  Channel,
+  Window,
+  MessageList,
+  MessageInput,
+  Thread,
+} from "stream-chat-react";
 import toast from "react-hot-toast";
+import { ArrowLeft, Flame, Info, Video } from "lucide-react";
+
+import useAuthUser from "../hooks/useAuthUser";
+import {
+  getStreamToken,
+  recordPractice,
+  getUserFriends,
+} from "../lib/api";
 import ChatLoader from "../component/ChatLoader";
-import { Flame, ArrowLeft, Info, Video } from "lucide-react";
-import { Link } from "react-router";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
 function ChatPage() {
   const { id: targetUserId } = useParams();
   const queryClient = useQueryClient();
+  const { authUser } = useAuthUser();
 
-  const [chatClient, setChatClient] = useState(null);
+  const [client, setClient] = useState(null);
   const [channel, setChannel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
-  const [sessionStartTime] = useState(Date.now());
   const [showStreakNotification, setShowStreakNotification] = useState(false);
-  const hasRecordedPractice = useRef(false);
 
-  const { authUser } = useAuthUser();
+  const sessionStartTime = useRef(Date.now());
+  const practiceRecorded = useRef(false);
 
+  /* --------------------------------------------------
+     DATA
+  -------------------------------------------------- */
   const { data: tokenData } = useQuery({
     queryKey: ["streamToken"],
     queryFn: getStreamToken,
-    enabled: !!authUser
+    enabled: !!authUser,
   });
 
   const { data: friends = [] } = useQuery({
@@ -48,172 +53,197 @@ function ChatPage() {
 
   const currentFriend = friends.find(f => f._id === targetUserId);
 
+  /* --------------------------------------------------
+     PRACTICE MUTATION
+  -------------------------------------------------- */
   const { mutate: recordPracticeMutation } = useMutation({
     mutationFn: recordPractice,
     onSuccess: (data) => {
-      console.log("✅ Practice recorded:", data);
       queryClient.invalidateQueries({ queryKey: ["practiceStats"] });
-      
+
       if (data.currentStreak > 0) {
         setShowStreakNotification(true);
         setTimeout(() => setShowStreakNotification(false), 5000);
-        
+
         if (data.currentStreak % 7 === 0) {
-          toast.success(`🔥 ${data.currentStreak} day streak! Amazing!`, {
-            duration: 4000,
-            icon: '🏆'
+          toast.success(`🔥 ${data.currentStreak} day streak!`, {
+            icon: "🏆",
           });
         }
       }
     },
-    onError: (error) => {
-      console.error("❌ Failed to record practice:", error);
-    }
+    onError: () => {
+      toast.error("Failed to record practice");
+    },
   });
 
+  /* --------------------------------------------------
+     STREAM INIT
+  -------------------------------------------------- */
   useEffect(() => {
-    const initChat = async () => {
-      if (!tokenData?.token || !authUser) return;
-      try {
-        console.log("initializing stream chat client .....");
+    if (!authUser || !tokenData?.token) return;
 
-        const client = StreamChat.getInstance(STREAM_API_KEY);
-        await client.connectUser({
-          id: authUser._id,
-          name: authUser.fullName,
-          image: authUser.profilePic,
-        }, tokenData.token);
+    let chatClient;
+    let activeChannel;
+
+    const init = async () => {
+      try {
+        chatClient = StreamChat.getInstance(STREAM_API_KEY);
+
+        await chatClient.connectUser(
+          {
+            id: authUser._id,
+            name: authUser.fullName,
+            image: authUser.profilePic,
+          },
+          tokenData.token
+        );
 
         const channelId = [authUser._id, targetUserId].sort().join("-");
 
-        const currentChannel = client.channel("messaging", channelId, {
+        activeChannel = chatClient.channel("messaging", channelId, {
           members: [authUser._id, targetUserId],
         });
 
-        await currentChannel.watch();
+        await activeChannel.watch();
 
-        setChatClient(client);
-        setChannel(currentChannel);
-
-        currentChannel.on('message.new', (event) => {
+        activeChannel.on("message.new", (event) => {
           if (event.user?.id === authUser._id) {
-            setMessageCount(prev => prev + 1);
+            setMessageCount((c) => c + 1);
           }
         });
 
-      } catch (error) {
-        console.error("Error initializing chat:", error);
-        toast.error("Could not connect chat. Please try again.");
+        setClient(chatClient);
+        setChannel(activeChannel);
+      } catch (err) {
+        console.error(err);
+        toast.error("Could not connect to chat");
       } finally {
         setLoading(false);
       }
-    }
-    initChat()
-  }, [tokenData, authUser, targetUserId]);
+    };
 
+    init();
+
+    return () => {
+      chatClient?.disconnectUser();
+    };
+  }, [authUser, tokenData, targetUserId]);
+
+  /* --------------------------------------------------
+     PRACTICE TRACKING
+  -------------------------------------------------- */
   useEffect(() => {
-    if (messageCount >= 3 && !hasRecordedPractice.current) {
-      hasRecordedPractice.current = true;
-      
-      const sessionDuration = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
-      
-      recordPracticeMutation({
-        activityType: "chat",
-        partnerId: targetUserId,
-        duration: sessionDuration
-      });
+    if (messageCount < 3 || practiceRecorded.current) return;
 
-      toast.success("Practice session recorded! 🎉", { 
-        duration: 3000,
-        icon: '✅'
-      });
-    }
-  }, [messageCount, targetUserId, recordPracticeMutation, sessionStartTime]);
+    practiceRecorded.current = true;
 
+    const duration = Math.max(
+      1,
+      Math.round((Date.now() - sessionStartTime.current) / 60000)
+    );
+
+    recordPracticeMutation({
+      activityType: "chat",
+      partnerId: targetUserId,
+      duration,
+    });
+
+    toast.success("Practice session recorded 🎉");
+  }, [messageCount, targetUserId, recordPracticeMutation]);
+
+  /* --------------------------------------------------
+     SAFETY: PAGE CLOSE
+  -------------------------------------------------- */
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (messageCount > 0 && !hasRecordedPractice.current) {
-        const sessionDuration = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
-        
-        const data = JSON.stringify({
-          activityType: "chat",
-          partnerId: targetUserId,
-          duration: sessionDuration
-        });
-        
-        navigator.sendBeacon('/api/practice/record', data);
+    const handleUnload = () => {
+      if (!practiceRecorded.current && messageCount > 0) {
+        const duration = Math.max(
+          1,
+          Math.round((Date.now() - sessionStartTime.current) / 60000)
+        );
+
+        navigator.sendBeacon(
+          "/api/practice/record",
+          JSON.stringify({
+            activityType: "chat",
+            partnerId: targetUserId,
+            duration,
+          })
+        );
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [messageCount, targetUserId, sessionStartTime]);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [messageCount, targetUserId]);
 
+  /* --------------------------------------------------
+     ACTIONS
+  -------------------------------------------------- */
   const handleVideoCall = async () => {
-    if (channel) {
-      const callUrl = `${window.location.origin}/call/${channel.id}`;
-      await channel.sendMessage({
-        text: `📹 I've started a video call. Join me here: ${callUrl}`,
-      });
+    if (!channel) return;
 
-      toast.success("Video call link sent!", {
-        icon: '📹'
-      });
-    }
-  }
+    const callUrl = `${window.location.origin}/call/${channel.id}`;
 
-  if (loading || !chatClient || !channel) return <ChatLoader />;
+    await channel.sendMessage({
+      text: `📹 I've started a video call. Join me here: ${callUrl}`,
+    });
 
+    toast.success("Video call link sent 📹");
+  };
+
+  if (loading || !client || !channel) return <ChatLoader />;
+
+  /* --------------------------------------------------
+     RENDER
+  -------------------------------------------------- */
   return (
     <div className="fixed inset-0 flex flex-col bg-base-100 z-50">
-      {/* Single Custom Header */}
-      <div className="bg-base-200 border-b border-base-300 px-4 py-3 flex-shrink-0 shadow-sm">
+      {/* Header */}
+      <div className="bg-base-200 border-b border-base-300 px-4 py-3 shadow-sm">
         <div className="container mx-auto flex items-center justify-between gap-4">
-          {/* Left: Back Button + Friend Info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Link to="/" className="btn btn-ghost btn-sm btn-circle flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to="/" className="btn btn-ghost btn-sm btn-circle">
               <ArrowLeft className="size-5" />
             </Link>
-            
+
             {currentFriend && (
               <div className="flex items-center gap-3 min-w-0">
-                <div className="avatar online flex-shrink-0">
-                  <div className="w-10 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                    <img src={currentFriend.profilePic} alt={currentFriend.fullName} />
+                <div className="avatar online">
+                  <div className="w-10 rounded-full ring ring-primary ring-offset-2">
+                    <img src={currentFriend.profilePic} alt="" />
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-sm truncate">{currentFriend.fullName}</h3>
-                  <p className="text-xs text-base-content/60 truncate">
-                    {currentFriend.nativeLanguages?.[0] || 'Language learner'}
+                  <h3 className="text-sm font-bold truncate">
+                    {currentFriend.fullName}
+                  </h3>
+                  <p className="text-xs opacity-60 truncate">
+                    {currentFriend.nativeLanguages?.[0] || "Language learner"}
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right: Stats & Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Message Counter */}
+          <div className="flex items-center gap-2">
             {messageCount > 0 && (
-              <div className="badge badge-success gap-1 hidden sm:flex">
+              <div className="badge badge-success hidden sm:flex gap-1">
                 <Flame className="size-3" />
                 {messageCount}
               </div>
             )}
-            
-            {/* Video Call Button */}
+
             <button
               onClick={handleVideoCall}
               className="btn btn-primary btn-sm gap-2"
-              title="Start video call"
             >
               <Video className="size-4" />
               <span className="hidden sm:inline">Call</span>
             </button>
-            
-            {/* Info Button */}
-            <div className="tooltip tooltip-bottom hidden sm:block" data-tip="Messages tracked for practice streaks">
+
+            <div className="tooltip tooltip-bottom hidden sm:block" data-tip="Messages tracked for streaks">
               <button className="btn btn-ghost btn-sm btn-circle">
                 <Info className="size-4" />
               </button>
@@ -222,15 +252,14 @@ function ChatPage() {
         </div>
       </div>
 
-      {/* Streak Notification */}
       {showStreakNotification && (
-        <div className="alert alert-success shadow-lg mx-4 mt-4 animate-in slide-in-from-top flex-shrink-0">
+        <div className="alert alert-success mx-4 mt-4 shadow-lg">
           <Flame className="size-5" />
           <div>
-            <h3 className="font-bold">Practice Recorded! 🎉</h3>
-            <div className="text-xs">Your streak is growing. Keep it up!</div>
+            <h3 className="font-bold">Practice Recorded 🎉</h3>
+            <p className="text-xs">Your streak is growing!</p>
           </div>
-          <button 
+          <button
             onClick={() => setShowStreakNotification(false)}
             className="btn btn-ghost btn-sm btn-circle"
           >
@@ -239,12 +268,10 @@ function ChatPage() {
         </div>
       )}
 
-      {/* Chat Container */}
-      <div className="flex-1 overflow-hidden min-h-0">
-        <Chat client={chatClient} theme="str-chat__theme-light">
+      <div className="flex-1 overflow-hidden">
+        <Chat client={client} theme="str-chat__theme-light">
           <Channel channel={channel}>
             <Window>
-              {/* No ChannelHeader - using custom header above */}
               <MessageList />
               <MessageInput focus />
             </Window>
@@ -253,7 +280,7 @@ function ChatPage() {
         </Chat>
       </div>
     </div>
-  )
+  );
 }
 
-export default ChatPage
+export default ChatPage;
