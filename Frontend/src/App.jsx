@@ -18,6 +18,9 @@ import GroupChatPage from "./pages/GroupChatPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import FindPartnersPage from "./pages/FindPartnersPage";
 import PracticePage from "./pages/PracticePage.jsx";
+import FriendsPage from "./pages/FriendsPage";
+import MessagesPage from "./pages/MessagesPage";
+
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
   const { theme } = useThemeStore();
@@ -159,6 +162,8 @@ const App = () => {
         <Route path="*" element={<Navigate to="/" replace />} />
 
         <Route path="/practice" element={<PracticePage />} />
+        <Route path="/friends" element={<FriendsPage />} />
+        <Route path="/messages" element={<MessagesPage />} />
       </Routes>
     </div>
   );

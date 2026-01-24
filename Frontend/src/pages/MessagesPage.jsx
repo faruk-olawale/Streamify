@@ -1,0 +1,494 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { getStreamToken, getUserFriends } from "../lib/api";
+import useAuthUser from "../hooks/useAuthUser";
+import { StreamChat } from "stream-chat";
+import { 
+  Search, Filter, MessageCircle, Pin, Archive, Trash2, 
+  MoreVertical, Check, Star, Clock, Video, Phone,
+  ArrowLeft, Plus, Loader
+} from "lucide-react";
+import { Link } from "react-router";
+import { formatDistanceToNow } from "date-fns";
+
+const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
+
+const MessagesPage = () => {
+  const navigate = useNavigate();
+  const { authUser } = useAuthUser();
+  const [chatClient, setChatClient] = useState(null);
+  const [channels, setChannels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("all"); // all, unread, favorites
+  const [selectedChannels, setSelectedChannels] = useState(new Set());
+  const [showActions, setShowActions] = useState(false);
+  
+  const { data: tokenData } = useQuery({
+    queryKey: ["streamToken"],
+    queryFn: getStreamToken,
+    enabled: !!authUser
+  });
+
+  const { data: friends = [] } = useQuery({
+    queryKey: ["friends"],
+    queryFn: getUserFriends,
+  });
+
+  // Initialize Stream Chat
+  useEffect(() => {
+    const initChat = async () => {
+      if (!tokenData?.token || !authUser) return;
+      
+      try {
+        const client = StreamChat.getInstance(STREAM_API_KEY);
+        await client.connectUser({
+          id: authUser._id,
+          name: authUser.fullName,
+          image: authUser.profilePic,
+        }, tokenData.token);
+
+        setChatClient(client);
+        
+        // Load channels
+        const filters = { 
+          type: 'messaging',
+          members: { $in: [authUser._id] }
+        };
+        const sort = [{ last_message_at: -1 }];
+        
+        const channelList = await client.queryChannels(filters, sort, {
+          watch: true,
+          state: true,
+        });
+
+        setChannels(channelList);
+        setLoading(false);
+
+        // Listen for new messages
+        client.on('message.new', (event) => {
+          if (event.channel_id) {
+            loadChannels(client);
+          }
+        });
+
+      } catch (error) {
+        console.error("Error initializing chat:", error);
+        setLoading(false);
+      }
+    };
+
+    initChat();
+
+    return () => {
+      if (chatClient) {
+        chatClient.disconnectUser();
+      }
+    };
+  }, [tokenData, authUser]);
+
+  const loadChannels = async (client) => {
+    const filters = { 
+      type: 'messaging',
+      members: { $in: [authUser._id] }
+    };
+    const sort = [{ last_message_at: -1 }];
+    
+    const channelList = await client.queryChannels(filters, sort, {
+      watch: true,
+      state: true,
+    });
+
+    setChannels(channelList);
+  };
+
+  // Get friend info from channel
+  const getFriendFromChannel = (channel) => {
+    const members = Object.values(channel.state.members || {});
+    const friend = members.find(m => m.user?.id !== authUser._id);
+    return friend?.user || null;
+  };
+
+  // Get last message
+  const getLastMessage = (channel) => {
+    const messages = channel.state.messages || [];
+    return messages[messages.length - 1];
+  };
+
+  // Get unread count
+  const getUnreadCount = (channel) => {
+    return channel.countUnread() || 0;
+  };
+
+  // Filter channels
+  const filteredChannels = channels.filter(channel => {
+    const friend = getFriendFromChannel(channel);
+    const lastMessage = getLastMessage(channel);
+    
+    // Search filter
+    if (searchQuery) {
+      const nameMatch = friend?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const messageMatch = lastMessage?.text?.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!nameMatch && !messageMatch) return false;
+    }
+
+    // Type filter
+    if (filterType === "unread") {
+      return getUnreadCount(channel) > 0;
+    }
+
+    return true;
+  });
+
+  // Handle channel click
+  const handleChannelClick = (channel) => {
+    const channelId = channel.id;
+    navigate(`/chat/${channelId.split('-')[1]}`); // Extract friend ID from channel ID
+  };
+
+  // Toggle channel selection
+  const toggleChannelSelection = (channelId) => {
+    const newSelected = new Set(selectedChannels);
+    if (newSelected.has(channelId)) {
+      newSelected.delete(channelId);
+    } else {
+      newSelected.add(channelId);
+    }
+    setSelectedChannels(newSelected);
+    setShowActions(newSelected.size > 0);
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedChannels.size} conversation(s)?`)) return;
+    
+    for (const channelId of selectedChannels) {
+      const channel = channels.find(c => c.id === channelId);
+      if (channel) {
+        await channel.delete();
+      }
+    }
+    
+    setSelectedChannels(new Set());
+    setShowActions(false);
+    loadChannels(chatClient);
+  };
+
+  // Mark all as read
+  const handleMarkAllRead = async () => {
+    for (const channelId of selectedChannels) {
+      const channel = channels.find(c => c.id === channelId);
+      if (channel) {
+        await channel.markRead();
+      }
+    }
+    
+    setSelectedChannels(new Set());
+    setShowActions(false);
+    loadChannels(chatClient);
+  };
+
+  return (
+    <div className="fixed inset-0 flex flex-col bg-base-100 z-40">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border-b border-base-300 flex-shrink-0">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Link to="/" className="btn btn-ghost btn-circle">
+                <ArrowLeft className="size-5" />
+              </Link>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold">Messages</h1>
+                <p className="text-sm text-base-content/70">
+                  {filteredChannels.length} conversation{filteredChannels.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            <button className="btn btn-primary btn-sm gap-2">
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-base-content/40" />
+              <input
+                type="text"
+                placeholder="Search messages or people..."
+                className="input input-bordered w-full pl-10 pr-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilterType("all")}
+                className={`btn btn-sm ${filterType === "all" ? "btn-primary" : "btn-outline"}`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterType("unread")}
+                className={`btn btn-sm ${filterType === "unread" ? "btn-primary" : "btn-outline"}`}
+              >
+                Unread
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {showActions && (
+        <div className="bg-primary text-primary-content px-4 py-3 flex items-center justify-between animate-in slide-in-from-top">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setSelectedChannels(new Set());
+                setShowActions(false);
+              }}
+              className="btn btn-ghost btn-sm btn-circle"
+            >
+              ✕
+            </button>
+            <span className="font-semibold">{selectedChannels.size} selected</span>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleMarkAllRead}
+              className="btn btn-ghost btn-sm gap-2"
+              title="Mark as read"
+            >
+              <Check className="size-4" />
+              <span className="hidden sm:inline">Mark Read</span>
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="btn btn-error btn-sm gap-2"
+              title="Delete"
+            >
+              <Trash2 className="size-4" />
+              <span className="hidden sm:inline">Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Messages List */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <Loader className="size-12 animate-spin text-primary mb-4" />
+            <p className="text-base-content/60">Loading conversations...</p>
+          </div>
+        ) : filteredChannels.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-4">
+            <MessageCircle className="size-16 text-base-content/30 mb-4" />
+            <h3 className="text-xl font-bold mb-2">
+              {searchQuery ? 'No conversations found' : 'No messages yet'}
+            </h3>
+            <p className="text-base-content/70 text-center mb-4 max-w-md">
+              {searchQuery 
+                ? 'Try a different search term'
+                : 'Start a conversation with your language partners'
+              }
+            </p>
+            {searchQuery ? (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="btn btn-primary btn-sm"
+              >
+                Clear Search
+              </button>
+            ) : (
+              <Link to="/find-partners" className="btn btn-primary">
+                Find Language Partners
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="space-y-2">
+              {filteredChannels.map((channel) => {
+                const friend = getFriendFromChannel(channel);
+                const lastMessage = getLastMessage(channel);
+                const unreadCount = getUnreadCount(channel);
+                const isSelected = selectedChannels.has(channel.id);
+
+                return (
+                  <ConversationCard
+                    key={channel.id}
+                    channel={channel}
+                    friend={friend}
+                    lastMessage={lastMessage}
+                    unreadCount={unreadCount}
+                    isSelected={isSelected}
+                    onSelect={() => toggleChannelSelection(channel.id)}
+                    onClick={() => !isSelected && handleChannelClick(channel)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Conversation Card Component
+const ConversationCard = ({ 
+  channel, 
+  friend, 
+  lastMessage, 
+  unreadCount, 
+  isSelected,
+  onSelect,
+  onClick 
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+
+  // Generate fallback avatar
+  const getAvatarUrl = () => {
+    if (friend?.image) return friend.image;
+    const name = encodeURIComponent(friend?.name || 'User');
+    return `https://ui-avatars.com/api/?name=${name}&background=random&size=128`;
+  };
+
+  // Format timestamp
+  const getTimeAgo = () => {
+    if (!lastMessage?.created_at) return '';
+    try {
+      return formatDistanceToNow(new Date(lastMessage.created_at), { addSuffix: true });
+    } catch {
+      return '';
+    }
+  };
+
+  // Truncate message
+  const truncateMessage = (text, maxLength = 60) => {
+    if (!text) return 'No messages yet';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  return (
+    <div
+      className={`card bg-base-200 hover:bg-base-300 transition-all cursor-pointer ${
+        isSelected ? 'ring-2 ring-primary' : ''
+      } ${unreadCount > 0 ? 'bg-primary/5' : ''}`}
+      onClick={onClick}
+    >
+      <div className="card-body p-4">
+        <div className="flex items-start gap-3">
+          {/* Checkbox (appears on hover or when selected) */}
+          <div className="flex-shrink-0">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-primary"
+              checked={isSelected}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSelect();
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Avatar */}
+          <div className="avatar online flex-shrink-0">
+            <div className="w-14 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+              <img 
+                src={getAvatarUrl()} 
+                alt={friend?.name}
+                onError={(e) => {
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(friend?.name || 'User')}&background=random&size=128`;
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className={`font-semibold truncate ${unreadCount > 0 ? 'text-primary' : ''}`}>
+                {friend?.name || 'Unknown User'}
+              </h3>
+              <span className="text-xs text-base-content/60 flex-shrink-0">
+                {getTimeAgo()}
+              </span>
+            </div>
+
+            {/* Last Message */}
+            <p className={`text-sm truncate ${unreadCount > 0 ? 'font-semibold' : 'text-base-content/70'}`}>
+              {lastMessage?.user?.id === channel.data?.created_by?.id ? 'You: ' : ''}
+              {truncateMessage(lastMessage?.text)}
+            </p>
+
+            {/* Meta Info */}
+            <div className="flex items-center gap-2 mt-2">
+              {unreadCount > 0 && (
+                <span className="badge badge-primary badge-sm">
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Actions Menu */}
+          <div className="dropdown dropdown-end flex-shrink-0">
+            <button
+              tabIndex={0}
+              className="btn btn-ghost btn-sm btn-circle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+            >
+              <MoreVertical className="size-4" />
+            </button>
+            {showMenu && (
+              <ul
+                tabIndex={0}
+                className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-52"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <li>
+                  <button onClick={() => channel.markRead()}>
+                    <Check className="size-4" />
+                    Mark as read
+                  </button>
+                </li>
+                <li>
+                  <button className="text-error">
+                    <Trash2 className="size-4" />
+                    Delete conversation
+                  </button>
+                </li>
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MessagesPage;

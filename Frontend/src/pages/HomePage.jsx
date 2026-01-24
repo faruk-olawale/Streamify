@@ -16,6 +16,7 @@ import {
 import FriendCard from "../component/FriendCard";
 import NoFriendsFound from "../component/NoFriendsFound";
 
+
 const HomePage = () => {
   const queryClient = useQueryClient();
   const [outgoingRequestIds, setOutgoingRequestIds] = useState(new Set());
@@ -411,7 +412,7 @@ const HomePage = () => {
             </Link>
 
             <Link 
-              to="/chat"
+              to="/messages"
               className="card bg-gradient-to-br from-success/10 to-success/5 hover:from-success/20 hover:to-success/10 border border-success/20 transition-all group"
             >
               <div className="card-body p-5 text-center">
