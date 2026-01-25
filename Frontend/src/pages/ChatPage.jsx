@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { StreamChat } from "stream-chat";
 import {
   Chat,
   Channel,
@@ -14,6 +13,7 @@ import toast from "react-hot-toast";
 import { ArrowLeft, Flame, Info, Video } from "lucide-react";
 
 import useAuthUser from "../hooks/useAuthUser";
+import { useStreamClient } from "../hooks/useStreamClient";
 import {
   getStreamToken,
   recordPractice,
@@ -21,21 +21,18 @@ import {
 } from "../lib/api";
 import ChatLoader from "../component/ChatLoader";
 
-const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
-
 function ChatPage() {
   const { id: targetUserId } = useParams();
   const queryClient = useQueryClient();
   const { authUser } = useAuthUser();
 
-  const [client, setClient] = useState(null);
   const [channel, setChannel] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
   const [showStreakNotification, setShowStreakNotification] = useState(false);
 
   const sessionStartTime = useRef(Date.now());
   const practiceRecorded = useRef(false);
+  const channelListenerAttached = useRef(false);
 
   /* --------------------------------------------------
      DATA
@@ -52,6 +49,12 @@ function ChatPage() {
   });
 
   const currentFriend = friends.find(f => f._id === targetUserId);
+
+  // Use the global Stream client
+  const { client, isConnecting } = useStreamClient(
+    authUser,
+    tokenData?.token
+  );
 
   /* --------------------------------------------------
      PRACTICE MUTATION
@@ -78,57 +81,59 @@ function ChatPage() {
   });
 
   /* --------------------------------------------------
-     STREAM INIT
+     CHANNEL SETUP (NOT CLIENT - CLIENT IS GLOBAL)
   -------------------------------------------------- */
   useEffect(() => {
-    if (!authUser || !tokenData?.token) return;
+    if (!client || !targetUserId) return;
 
-    let chatClient;
-    let activeChannel;
+    let activeChannel = null;
+    let isMounted = true;
 
-    const init = async () => {
+    const setupChannel = async () => {
       try {
-        chatClient = StreamChat.getInstance(STREAM_API_KEY);
-
-        await chatClient.connectUser(
-          {
-            id: authUser._id,
-            name: authUser.fullName,
-            image: authUser.profilePic,
-          },
-          tokenData.token
-        );
-
         const channelId = [authUser._id, targetUserId].sort().join("-");
 
-        activeChannel = chatClient.channel("messaging", channelId, {
+        activeChannel = client.channel("messaging", channelId, {
           members: [authUser._id, targetUserId],
         });
 
         await activeChannel.watch();
 
-        activeChannel.on("message.new", (event) => {
-          if (event.user?.id === authUser._id) {
-            setMessageCount((c) => c + 1);
-          }
-        });
+        // Attach message listener only once
+        if (!channelListenerAttached.current) {
+          activeChannel.on("message.new", (event) => {
+            if (event.user?.id === authUser._id && isMounted) {
+              setMessageCount((c) => c + 1);
+            }
+          });
+          channelListenerAttached.current = true;
+        }
 
-        setClient(chatClient);
-        setChannel(activeChannel);
+        if (isMounted) {
+          setChannel(activeChannel);
+        }
       } catch (err) {
-        console.error(err);
-        toast.error("Could not connect to chat");
-      } finally {
-        setLoading(false);
+        console.error("Failed to setup channel:", err);
+        if (isMounted) {
+          toast.error("Could not load chat");
+        }
       }
     };
 
-    init();
+    setupChannel();
 
     return () => {
-      chatClient?.disconnectUser();
+      isMounted = false;
+      channelListenerAttached.current = false;
+
+      // Only stop watching the channel, DON'T disconnect client
+      if (activeChannel) {
+        activeChannel.stopWatching().catch(console.error);
+      }
+
+      setChannel(null);
     };
-  }, [authUser, tokenData, targetUserId]);
+  }, [client, targetUserId, authUser._id]);
 
   /* --------------------------------------------------
      PRACTICE TRACKING
@@ -184,16 +189,22 @@ function ChatPage() {
   const handleVideoCall = async () => {
     if (!channel) return;
 
-    const callUrl = `${window.location.origin}/call/${channel.id}`;
+    try {
+      const callUrl = `${window.location.origin}/call/${channel.id}`;
 
-    await channel.sendMessage({
-      text: `📹 I've started a video call. Join me here: ${callUrl}`,
-    });
+      await channel.sendMessage({
+        text: `📹 I've started a video call. Join me here: ${callUrl}`,
+      });
 
-    toast.success("Video call link sent 📹");
+      toast.success("Video call link sent 📹");
+    } catch (error) {
+      console.error("Failed to send video call message:", error);
+      toast.error("Failed to send video call link");
+    }
   };
 
-  if (loading || !client || !channel) return <ChatLoader />;
+  // Show loader while connecting or setting up
+  if (isConnecting || !client || !channel) return <ChatLoader />;
 
   /* --------------------------------------------------
      RENDER
@@ -204,7 +215,7 @@ function ChatPage() {
       <div className="bg-base-200 border-b border-base-300 px-4 py-3 shadow-sm">
         <div className="container mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Link to="/" className="btn btn-ghost btn-sm btn-circle">
+            <Link to="/messages" className="btn btn-ghost btn-sm btn-circle">
               <ArrowLeft className="size-5" />
             </Link>
 

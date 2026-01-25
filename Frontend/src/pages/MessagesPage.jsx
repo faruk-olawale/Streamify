@@ -1,23 +1,19 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getStreamToken, getUserFriends } from "../lib/api";
 import useAuthUser from "../hooks/useAuthUser";
-import { StreamChat } from "stream-chat";
+import { useStreamClient } from "../hooks/useStreamClient";
 import { 
   Search, Filter, MessageCircle, Pin, Archive, Trash2, 
   MoreVertical, Check, Star, Clock, Video, Phone,
   ArrowLeft, Plus, Loader
 } from "lucide-react";
-import { Link } from "react-router";
 import { formatDistanceToNow } from "date-fns";
-
-const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
 const MessagesPage = () => {
   const navigate = useNavigate();
   const { authUser } = useAuthUser();
-  const [chatClient, setChatClient] = useState(null);
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,66 +32,71 @@ const MessagesPage = () => {
     queryFn: getUserFriends,
   });
 
-  // Initialize Stream Chat
-  useEffect(() => {
-    const initChat = async () => {
-      if (!tokenData?.token || !authUser) return;
-      
-      try {
-        const client = StreamChat.getInstance(STREAM_API_KEY);
-        await client.connectUser({
-          id: authUser._id,
-          name: authUser.fullName,
-          image: authUser.profilePic,
-        }, tokenData.token);
+  // Use the global Stream client hook
+  const { client: chatClient, isConnecting } = useStreamClient(
+    authUser,
+    tokenData?.token
+  );
 
-        setChatClient(client);
-        
-        // Load channels
+  // Load channels when client is ready
+  useEffect(() => {
+    if (!chatClient || !authUser) return;
+
+    let isMounted = true;
+
+    const loadChannels = async () => {
+      try {
         const filters = { 
           type: 'messaging',
           members: { $in: [authUser._id] }
         };
         const sort = [{ last_message_at: -1 }];
         
-        const channelList = await client.queryChannels(filters, sort, {
+        const channelList = await chatClient.queryChannels(filters, sort, {
           watch: true,
           state: true,
         });
 
-        setChannels(channelList);
-        setLoading(false);
-
-        // Listen for new messages
-        client.on('message.new', (event) => {
-          if (event.channel_id) {
-            loadChannels(client);
-          }
-        });
-
+        if (isMounted) {
+          setChannels(channelList);
+          setLoading(false);
+        }
       } catch (error) {
-        console.error("Error initializing chat:", error);
-        setLoading(false);
+        console.error("Error loading channels:", error);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    initChat();
+    loadChannels();
+
+    // Listen for new messages to update channel list
+    const handleNewMessage = (event) => {
+      if (event.channel_id && isMounted) {
+        loadChannels();
+      }
+    };
+
+    chatClient.on('message.new', handleNewMessage);
 
     return () => {
-      if (chatClient) {
-        chatClient.disconnectUser();
-      }
+      isMounted = false;
+      chatClient.off('message.new', handleNewMessage);
     };
-  }, [tokenData, authUser]);
+  }, [chatClient, authUser]);
 
-  const loadChannels = async (client) => {
+  // Reload channels helper
+  const reloadChannels = async () => {
+    if (!chatClient || !authUser) return;
+
     const filters = { 
       type: 'messaging',
       members: { $in: [authUser._id] }
     };
     const sort = [{ last_message_at: -1 }];
     
-    const channelList = await client.queryChannels(filters, sort, {
+    const channelList = await chatClient.queryChannels(filters, sort, {
       watch: true,
       state: true,
     });
@@ -143,8 +144,12 @@ const MessagesPage = () => {
 
   // Handle channel click
   const handleChannelClick = (channel) => {
-    const channelId = channel.id;
-    navigate(`/chat/${channelId.split('-')[1]}`); // Extract friend ID from channel ID
+    const members = Object.keys(channel.state.members || {});
+    const friendId = members.find(id => id !== authUser._id);
+    
+    if (friendId) {
+      navigate(`/chat/${friendId}`);
+    }
   };
 
   // Toggle channel selection
@@ -163,31 +168,49 @@ const MessagesPage = () => {
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedChannels.size} conversation(s)?`)) return;
     
-    for (const channelId of selectedChannels) {
-      const channel = channels.find(c => c.id === channelId);
-      if (channel) {
-        await channel.delete();
+    try {
+      for (const channelId of selectedChannels) {
+        const channel = channels.find(c => c.id === channelId);
+        if (channel) {
+          await channel.delete();
+        }
       }
+      
+      setSelectedChannels(new Set());
+      setShowActions(false);
+      await reloadChannels();
+    } catch (error) {
+      console.error("Error deleting channels:", error);
     }
-    
-    setSelectedChannels(new Set());
-    setShowActions(false);
-    loadChannels(chatClient);
   };
 
   // Mark all as read
   const handleMarkAllRead = async () => {
-    for (const channelId of selectedChannels) {
-      const channel = channels.find(c => c.id === channelId);
-      if (channel) {
-        await channel.markRead();
+    try {
+      for (const channelId of selectedChannels) {
+        const channel = channels.find(c => c.id === channelId);
+        if (channel) {
+          await channel.markRead();
+        }
       }
+      
+      setSelectedChannels(new Set());
+      setShowActions(false);
+      await reloadChannels();
+    } catch (error) {
+      console.error("Error marking channels as read:", error);
     }
-    
-    setSelectedChannels(new Set());
-    setShowActions(false);
-    loadChannels(chatClient);
   };
+
+  // Show loading state
+  if (isConnecting || loading) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-base-100">
+        <Loader className="size-12 animate-spin text-primary mb-4" />
+        <p className="text-base-content/60">Loading conversations...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 flex flex-col bg-base-100 z-40">
@@ -293,12 +316,7 @@ const MessagesPage = () => {
 
       {/* Messages List */}
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <Loader className="size-12 animate-spin text-primary mb-4" />
-            <p className="text-base-content/60">Loading conversations...</p>
-          </div>
-        ) : filteredChannels.length === 0 ? (
+        {filteredChannels.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-4">
             <MessageCircle className="size-16 text-base-content/30 mb-4" />
             <h3 className="text-xl font-bold mb-2">
@@ -342,6 +360,7 @@ const MessagesPage = () => {
                     isSelected={isSelected}
                     onSelect={() => toggleChannelSelection(channel.id)}
                     onClick={() => !isSelected && handleChannelClick(channel)}
+                    onReload={reloadChannels}
                   />
                 );
               })}
@@ -361,7 +380,8 @@ const ConversationCard = ({
   unreadCount, 
   isSelected,
   onSelect,
-  onClick 
+  onClick,
+  onReload
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -387,6 +407,32 @@ const ConversationCard = ({
     if (!text) return 'No messages yet';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+  };
+
+  // Handle mark as read
+  const handleMarkRead = async (e) => {
+    e.stopPropagation();
+    try {
+      await channel.markRead();
+      setShowMenu(false);
+      onReload();
+    } catch (error) {
+      console.error("Error marking as read:", error);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    if (!confirm('Delete this conversation?')) return;
+    
+    try {
+      await channel.delete();
+      setShowMenu(false);
+      onReload();
+    } catch (error) {
+      console.error("Error deleting channel:", error);
+    }
   };
 
   return (
@@ -471,13 +517,13 @@ const ConversationCard = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 <li>
-                  <button onClick={() => channel.markRead()}>
+                  <button onClick={handleMarkRead}>
                     <Check className="size-4" />
                     Mark as read
                   </button>
                 </li>
                 <li>
-                  <button className="text-error">
+                  <button onClick={handleDelete} className="text-error">
                     <Trash2 className="size-4" />
                     Delete conversation
                   </button>

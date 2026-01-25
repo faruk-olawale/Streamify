@@ -12,7 +12,7 @@ import {
   deleteGroup,
   getStreamToken,
 } from "../lib/api";
-import { StreamChat } from "stream-chat";
+import { useStreamClient } from "../hooks/useStreamClient";
 import {
   Chat,
   Channel,
@@ -45,12 +45,10 @@ import AddMembersModal from "../component/AddMembersModal";
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
   const navigate = useNavigate();
-  const [client, setClient] = useState(null);
   const [channel, setChannel] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
-  const setupInProgress = useRef(false);
   const queryClient = useQueryClient();
 
   // Fetch group details
@@ -66,63 +64,59 @@ const GroupChatPage = ({ authUser }) => {
   const group = groupData?.group;
   const userRole = groupData?.userRole;
 
-  // Setup Stream Chat
-  async function setupStream() {
-    if (setupInProgress.current || !group) return;
-    setupInProgress.current = true;
+  // Fetch Stream token
+  const { data: tokenData } = useQuery({
+    queryKey: ["streamToken"],
+    queryFn: getStreamToken,
+    enabled: !!authUser,
+  });
 
-    try {
-      const tokenData = await getStreamToken();
-      
-      if (!tokenData || !tokenData.token || !tokenData.user) {
-        throw new Error("Invalid token data received");
-      }
+  // Use global Stream client
+  const { client, isConnecting } = useStreamClient(
+    authUser,
+    tokenData?.token
+  );
 
-      const { token, user } = tokenData;
-
-      const streamClient = StreamChat.getInstance(
-        import.meta.env.VITE_STREAM_API_KEY
-      );
-
-      await streamClient.connectUser(
-        {
-          id: user._id,
-          name: user.name || user.fullName,
-          image: user.profilePicture || user.profilePic,
-        },
-        token
-      );
-
-      const groupChannel = streamClient.channel(
-        "messaging",
-        group.streamChannelId
-      );
-      await groupChannel.watch();
-
-      setClient(streamClient);
-      setChannel(groupChannel);
-    } catch (err) {
-      console.error("Stream setup error:", err);
-      toast.error("Could not connect to chat. Please try again.");
-    } finally {
-      setupInProgress.current = false;
-    }
-  }
-
+  // Setup channel when client and group are ready
   useEffect(() => {
-    if (group && userRole?.isMember && !client) {
-      setupStream();
+    if (!client || !group || !userRole?.isMember) {
+      setChannel(null);
+      return;
     }
-  }, [group, userRole, client]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (client) {
-        client.disconnectUser().catch(console.error);
+    let activeChannel = null;
+    let isMounted = true;
+
+    const setupChannel = async () => {
+      try {
+        activeChannel = client.channel(
+          "messaging",
+          group.streamChannelId
+        );
+        await activeChannel.watch();
+
+        if (isMounted) {
+          setChannel(activeChannel);
+        }
+      } catch (err) {
+        console.error("Channel setup error:", err);
+        if (isMounted) {
+          toast.error("Could not connect to chat. Please try again.");
+        }
       }
     };
-  }, [client]);
+
+    setupChannel();
+
+    return () => {
+      isMounted = false;
+      // Only stop watching the channel, don't disconnect client
+      if (activeChannel) {
+        activeChannel.stopWatching().catch(console.error);
+      }
+      setChannel(null);
+    };
+  }, [client, group, userRole]);
 
   // Request to join mutation
   const requestJoinMutation = useMutation({
@@ -199,7 +193,7 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  if (loadingGroup) {
+  if (loadingGroup || isConnecting) {
     return (
       <div className="h-full flex items-center justify-center">
         <span className="loading loading-spinner loading-lg"></span>
@@ -225,9 +219,9 @@ const GroupChatPage = ({ authUser }) => {
   );
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-screen w-screen flex flex-col bg-base-100 overflow-hidden">
       {/* Header */}
-      <div className="bg-base-200 p-3 md:p-4 flex items-center justify-between border-b border-base-300">
+      <div className="bg-base-200 p-3 md:p-4 flex items-center justify-between border-b border-base-300 flex-shrink-0">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           <button
             onClick={() => navigate("/groups")}
@@ -265,9 +259,9 @@ const GroupChatPage = ({ authUser }) => {
         )}
       </div>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {!userRole?.isMember ? (
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="text-center max-w-md">
@@ -302,17 +296,19 @@ const GroupChatPage = ({ authUser }) => {
               </div>
             </div>
           ) : client && channel ? (
-            <Chat client={client}>
-              <Channel channel={channel}>
-                <Window>
-                  <ChannelHeader />
-                  <MessageList />
-                  <TypingIndicator />
-                  <MessageInput />
-                </Window>
-                <Thread />
-              </Channel>
-            </Chat>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <Chat client={client}>
+                <Channel channel={channel}>
+                  <Window>
+                    <ChannelHeader />
+                    <MessageList />
+                    <TypingIndicator />
+                    <MessageInput />
+                  </Window>
+                  <Thread />
+                </Channel>
+              </Chat>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <span className="loading loading-spinner loading-lg"></span>
