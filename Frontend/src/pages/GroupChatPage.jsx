@@ -219,7 +219,7 @@ const GroupChatPage = ({ authUser }) => {
   );
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-base-100 overflow-hidden">
+    <div className="h-[100dvh] w-full flex flex-col bg-base-100 overflow-hidden">
       {/* Header */}
       <div className="bg-base-200 p-3 md:p-4 flex items-center justify-between border-b border-base-300 flex-shrink-0">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
