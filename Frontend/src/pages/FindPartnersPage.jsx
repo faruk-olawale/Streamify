@@ -47,11 +47,18 @@ const FindPartnersPage = () => {
   /* =======================
      TRACK OUTGOING REQUESTS
   ======================= */
-  useEffect(() => {
-    const ids = new Set();
-    outgoingFriendsReqs?.forEach((req) => ids.add(req.recipient._id));
-    setOutgoingRequestIds(ids);
-  }, [outgoingFriendsReqs]);
+useEffect(() => {
+  if (!outgoingFriendsReqs) return;
+  
+  const ids = new Set();
+  outgoingFriendsReqs.forEach((req) => {
+    // Add null check for recipient
+    if (req?.recipient?._id) {
+      ids.add(req.recipient._id);
+    }
+      });
+      setOutgoingRequestIds(ids);
+    }, [outgoingFriendsReqs]);
 
   /* =======================
      FILTERING LOGIC
