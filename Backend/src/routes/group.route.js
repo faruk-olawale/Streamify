@@ -17,7 +17,16 @@ import {
   markGroupNotificationsRead,
   getUnreadNotificationCount,
   addMemberDirectly,
-  getAvailableFriendsForGroup
+  getAvailableFriendsForGroup,
+  pinMessage,
+  unpinMessage,
+  getPinnedMessages,
+  getGroupActivity,
+  scheduleVideoSession,
+  createPoll,
+  votePoll,
+  setPracticeGoal,
+  // getUserProfile - REMOVE THIS (it belongs in user.route.js)
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
@@ -44,10 +53,23 @@ router.post("/:groupId/approve/:userId", protectRoute, approveJoinRequest);
 router.post("/:groupId/reject/:userId", protectRoute, rejectJoinRequest);
 
 // Member management
-router.post("/:groupId/add-member", protectRoute, addMemberDirectly); // ✅ FIXED
+router.post("/:groupId/add-member", protectRoute, addMemberDirectly);
 router.delete("/:groupId/members/:userId", protectRoute, removeMember);
 router.post("/:groupId/make-admin/:userId", protectRoute, makeAdmin);
 router.post("/:groupId/leave", protectRoute, leaveGroup);
 
-export default router;
+// Pinned messages
+router.post("/:groupId/messages/:messageId/pin", protectRoute, pinMessage);
+router.delete("/:groupId/messages/:messageId/pin", protectRoute, unpinMessage);
+router.get("/:groupId/pinned-messages", protectRoute, getPinnedMessages);
 
+// Activity timeline
+router.get("/:groupId/activity", protectRoute, getGroupActivity);
+
+// Quick actions
+router.post("/:groupId/sessions", protectRoute, scheduleVideoSession);
+router.post("/:groupId/polls", protectRoute, createPoll);
+router.post("/:groupId/polls/:pollId/vote", protectRoute, votePoll);
+router.post("/:groupId/goals", protectRoute, setPracticeGoal);
+
+export default router;

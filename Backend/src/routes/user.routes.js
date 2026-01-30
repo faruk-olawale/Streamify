@@ -10,6 +10,7 @@ import {
   markFriendNotificationsRead,
   updateProfile
 } from "../controllers/user.controller.js";
+import { getUserProfile } from "../controllers/group.controller.js";
 
 const router = express.Router();
 
@@ -29,5 +30,7 @@ router.patch("/friend-notifications/read", markFriendNotificationsRead);
 
 // Profile update - REMOVE the duplicate protectRoute
 router.put("/update-profile", updateProfile);
+
+router.get("/:userId/profile", protectRoute, getUserProfile);
 
 export default router;

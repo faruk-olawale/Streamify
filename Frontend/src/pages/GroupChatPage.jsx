@@ -38,9 +38,33 @@ import {
   XCircle,
   Edit,
   X,
+  Mic,
+  StopCircle,
+  Play,
+  Pause,
+  Pin,
+  Search,
+  Calendar,
+  BarChart3,
+  MessageSquare,
+  Image as ImageIcon,
+  FileText,
+  Video,
+  Volume2,
+  Send,
+  MoreVertical,
+  Clock,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
 import EditGroupModal from "../component/EditGroupModal";
 import AddMembersModal from "../component/AddMembersModal";
+import MemberProfileModal from "../component/MemberProfileModal";
+import VoiceMessageRecorder from "../component/VoiceMessageRecorder";
+import PinnedMessagesPanel from "../component/PinnedMessagesPanel";
+import MessageSearchPanel from "../component/MessageSearchPanel";
+import ActivityTimelinePanel from "../component/ActivityTimelinePanel";
+import QuickActionsMenu from "../component/QuickActionsMenu";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
@@ -49,6 +73,12 @@ const GroupChatPage = ({ authUser }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState("about"); // about, media, files, activity
   const queryClient = useQueryClient();
 
   // Fetch group details
@@ -218,6 +248,269 @@ const GroupChatPage = ({ authUser }) => {
     (req) => req.userId._id === authUser._id
   );
 
+  const renderSettingsContent = () => {
+    switch (activeSettingsTab) {
+      case "about":
+        return (
+          <>
+            {/* Group Info */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold">About</h4>
+                {userRole.isAdmin && (
+                  <button
+                    onClick={() => {
+                      setShowEditModal(true);
+                      setShowSettings(false);
+                    }}
+                    className="btn btn-ghost btn-xs gap-1"
+                  >
+                    <Edit size={14} />
+                    Edit
+                  </button>
+                )}
+              </div>
+              
+              {/* Group Image */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="avatar">
+                  <div className="w-16 h-16 rounded-lg">
+                    <img 
+                      src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                      alt={group.name}
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h5 className="font-semibold truncate">{group.name}</h5>
+                  <p className="text-xs text-base-content/60">
+                    {group.members?.length || 0} members
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-sm text-base-content/70 mb-2">
+                {group.description || "No description"}
+              </p>
+              
+              <div className="flex items-center gap-2 text-sm text-base-content/60">
+                <Crown size={14} className="text-warning flex-shrink-0" />
+                <span className="truncate">Created by {group.createdBy?.fullName}</span>
+              </div>
+            </div>
+
+            {/* Add Members Button (Admin Only) */}
+            {userRole.isAdmin && (
+              <div className="mb-6">
+                <button
+                  onClick={() => {
+                    setShowAddMembersModal(true);
+                    setShowSettings(false);
+                  }}
+                  className="btn btn-primary btn-block gap-2"
+                >
+                  <UserPlus size={18} />
+                  Add Members
+                </button>
+              </div>
+            )}
+
+            {/* Pending Requests (Admin Only) */}
+            {userRole.isAdmin && group.pendingRequests?.length > 0 && (
+              <div className="mb-6">
+                <h4 className="font-semibold mb-2">
+                  Pending Requests ({group.pendingRequests.length})
+                </h4>
+                <div className="space-y-2">
+                  {group.pendingRequests.map((request) => (
+                    <div
+                      key={request.userId._id}
+                      className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="avatar flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full">
+                            <img
+                              src={request.userId.profilePic}
+                              alt={request.userId.fullName}
+                              onError={(e) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium truncate">
+                          {request.userId.fullName}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
+                              approveRequestMutation.mutate(request.userId._id);
+                            }
+                          }}
+                          className="btn btn-success btn-xs"
+                          title="Approve"
+                          disabled={approveRequestMutation.isPending}
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
+                              rejectRequestMutation.mutate(request.userId._id);
+                            }
+                          }}
+                          className="btn btn-error btn-xs"
+                          title="Reject"
+                          disabled={rejectRequestMutation.isPending}
+                        >
+                          <XCircle size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Members List */}
+            <div className="mb-6">
+              <h4 className="font-semibold mb-2">
+                Members ({group.members?.length || 0})
+              </h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {group.members?.map((member) => {
+                  const isAdmin = group.admins?.some(
+                    (admin) => admin._id === member._id
+                  );
+                  const isCreator = group.createdBy?._id === member._id;
+
+                  return (
+                    <div
+                      key={member._id}
+                      className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2 hover:bg-base-200 transition-colors cursor-pointer"
+                      onClick={() => setSelectedMember(member)}
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="avatar flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full">
+                            <img
+                              src={member.profilePic}
+                              alt={member.fullName}
+                              onError={(e) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-medium truncate">
+                              {member.fullName}
+                            </span>
+                            {isCreator && (
+                              <Crown
+                                size={14}
+                                className="flex-shrink-0 text-warning"
+                                title="Creator"
+                              />
+                            )}
+                            {isAdmin && !isCreator && (
+                              <Shield
+                                size={14}
+                                className="flex-shrink-0 text-info"
+                                title="Admin"
+                              />
+                            )}
+                          </div>
+                          {/* Member status indicator */}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="w-2 h-2 rounded-full bg-success"></span>
+                            <span className="text-xs text-base-content/50">Available to practice</span>
+                          </div>
+                        </div>
+                      </div>
+                      {userRole.isAdmin &&
+                        member._id !== authUser._id &&
+                        !isCreator && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Remove ${member.fullName} from the group?`)) {
+                                removeMemberMutation.mutate(member._id);
+                              }
+                            }}
+                            className="btn btn-error btn-xs flex-shrink-0"
+                            title="Remove member"
+                            disabled={removeMemberMutation.isPending}
+                          >
+                            <UserMinus size={14} />
+                          </button>
+                        )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        );
+
+      case "media":
+        return (
+          <div className="space-y-4">
+            <h4 className="font-semibold">Media Gallery</h4>
+            <p className="text-sm text-base-content/60">All images and videos shared in this group</p>
+            
+            {/* Media Grid - Mock data for now */}
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="aspect-square bg-base-300 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+            
+            <div className="text-center py-4">
+              <p className="text-sm text-base-content/50">No media shared yet</p>
+            </div>
+          </div>
+        );
+
+      case "files":
+        return (
+          <div className="space-y-4">
+            <h4 className="font-semibold">Shared Files</h4>
+            <p className="text-sm text-base-content/60">All documents shared in this group</p>
+            
+            {/* Files List - Mock data */}
+            <div className="space-y-2">
+              {[
+                { name: "Spanish_Grammar_Guide.pdf", size: "2.4 MB", date: "2 days ago" },
+                { name: "Vocabulary_List.docx", size: "150 KB", date: "1 week ago" },
+              ].map((file, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 bg-base-100 rounded-lg hover:bg-base-200 transition-colors cursor-pointer">
+                  <FileText size={20} className="text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-base-content/50">{file.size} • {file.date}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case "activity":
+        return <ActivityTimelinePanel group={group} />;
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-base-100 overflow-hidden">
       {/* Header */}
@@ -249,13 +542,34 @@ const GroupChatPage = ({ authUser }) => {
         </div>
 
         {userRole?.isMember && (
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="btn btn-ghost btn-sm gap-1 md:gap-2 flex-shrink-0"
-          >
-            <Settings size={18} className="md:w-5 md:h-5" />
-            {userRole.isAdmin && <Shield size={14} className="md:w-4 md:h-4 text-warning" />}
-          </button>
+          <div className="flex items-center gap-1 md:gap-2">
+            {/* Search Button */}
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+              title="Search messages"
+            >
+              <Search size={18} className="md:w-5 md:h-5" />
+            </button>
+
+            {/* Pinned Messages Button */}
+            <button
+              onClick={() => setShowPinnedMessages(!showPinnedMessages)}
+              className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+              title="Pinned messages"
+            >
+              <Pin size={18} className="md:w-5 md:h-5" />
+            </button>
+
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="btn btn-ghost btn-sm gap-1 md:gap-2 flex-shrink-0"
+            >
+              <Settings size={18} className="md:w-5 md:h-5" />
+              {userRole.isAdmin && <Shield size={14} className="md:w-4 md:h-4 text-warning" />}
+            </button>
+          </div>
         )}
       </div>
 
@@ -296,19 +610,70 @@ const GroupChatPage = ({ authUser }) => {
               </div>
             </div>
           ) : client && channel ? (
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <Chat client={client}>
-                <Channel channel={channel}>
-                  <Window>
-                    <ChannelHeader />
-                    <MessageList />
-                    <TypingIndicator />
-                    <MessageInput />
-                  </Window>
-                  <Thread />
-                </Channel>
-              </Chat>
-            </div>
+            <>
+              {/* Pinned Messages Panel */}
+              {showPinnedMessages && (
+                <div className="bg-base-200 border-b border-base-300">
+                  <PinnedMessagesPanel
+                    channel={channel}
+                    onClose={() => setShowPinnedMessages(false)}
+                  />
+                </div>
+              )}
+
+              {/* Search Panel */}
+              {showSearch && (
+                <div className="bg-base-200 border-b border-base-300">
+                  <MessageSearchPanel
+                    channel={channel}
+                    onClose={() => setShowSearch(false)}
+                  />
+                </div>
+              )}
+
+              <div className="flex-1 min-h-0 overflow-hidden relative">
+                <Chat client={client}>
+                  <Channel channel={channel}>
+                    <Window>
+                      <ChannelHeader />
+                      <MessageList />
+                      <TypingIndicator />
+                      
+                      {/* Custom Message Input Area with Voice */}
+                      <div className="relative">
+                        <MessageInput />
+                        <button
+                          onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                          className="absolute right-2 bottom-2 btn btn-circle btn-sm btn-ghost"
+                          title="Send voice message"
+                        >
+                          <Mic size={18} />
+                        </button>
+                      </div>
+
+                      {/* Voice Recorder */}
+                      {showVoiceRecorder && (
+                        <VoiceMessageRecorder
+                          channel={channel}
+                          onClose={() => setShowVoiceRecorder(false)}
+                        />
+                      )}
+                    </Window>
+                    <Thread />
+                  </Channel>
+                </Chat>
+
+                {/* Floating Quick Actions Button */}
+                <div className="absolute bottom-20 right-4 z-10">
+                  <button
+                    onClick={() => setShowQuickActions(!showQuickActions)}
+                    className="btn btn-primary btn-circle btn-lg shadow-lg hover:shadow-xl transition-shadow"
+                  >
+                    <Zap size={24} />
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <span className="loading loading-spinner loading-lg"></span>
@@ -352,206 +717,43 @@ const GroupChatPage = ({ authUser }) => {
                 {/* Desktop Title */}
                 <h3 className="font-bold text-lg mb-4 hidden lg:block">Group Settings</h3>
 
-                {/* Group Info */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold">About</h4>
-                    {userRole.isAdmin && (
-                      <button
-                        onClick={() => {
-                          setShowEditModal(true);
-                          setShowSettings(false);
-                        }}
-                        className="btn btn-ghost btn-xs gap-1"
-                      >
-                        <Edit size={14} />
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                  
-                  {/* Group Image */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="avatar">
-                      <div className="w-16 h-16 rounded-lg">
-                        <img 
-                          src={group.image || "https://via.placeholder.com/150?text=Group"} 
-                          alt={group.name}
-                          onError={(e) => {
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h5 className="font-semibold truncate">{group.name}</h5>
-                      <p className="text-xs text-base-content/60">
-                        {group.members?.length || 0} members
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-sm text-base-content/70 mb-2">
-                    {group.description || "No description"}
-                  </p>
-                  
-                  <div className="flex items-center gap-2 text-sm text-base-content/60">
-                    <Crown size={14} className="text-warning flex-shrink-0" />
-                    <span className="truncate">Created by {group.createdBy?.fullName}</span>
-                  </div>
+                {/* Settings Tabs */}
+                <div className="tabs tabs-boxed mb-4">
+                  <button
+                    className={`tab ${activeSettingsTab === "about" ? "tab-active" : ""}`}
+                    onClick={() => setActiveSettingsTab("about")}
+                  >
+                    <Users size={14} className="mr-1" />
+                    About
+                  </button>
+                  <button
+                    className={`tab ${activeSettingsTab === "media" ? "tab-active" : ""}`}
+                    onClick={() => setActiveSettingsTab("media")}
+                  >
+                    <ImageIcon size={14} className="mr-1" />
+                    Media
+                  </button>
+                  <button
+                    className={`tab ${activeSettingsTab === "files" ? "tab-active" : ""}`}
+                    onClick={() => setActiveSettingsTab("files")}
+                  >
+                    <FileText size={14} className="mr-1" />
+                    Files
+                  </button>
+                  <button
+                    className={`tab ${activeSettingsTab === "activity" ? "tab-active" : ""}`}
+                    onClick={() => setActiveSettingsTab("activity")}
+                  >
+                    <TrendingUp size={14} className="mr-1" />
+                    Activity
+                  </button>
                 </div>
 
-                {/* Add Members Button (Admin Only) */}
-                {userRole.isAdmin && (
-                  <div className="mb-6">
-                    <button
-                      onClick={() => {
-                        setShowAddMembersModal(true);
-                        setShowSettings(false);
-                      }}
-                      className="btn btn-primary btn-block gap-2"
-                    >
-                      <UserPlus size={18} />
-                      Add Members
-                    </button>
-                  </div>
-                )}
-
-                {/* Pending Requests (Admin Only) */}
-                {userRole.isAdmin && group.pendingRequests?.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="font-semibold mb-2">
-                      Pending Requests ({group.pendingRequests.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {group.pendingRequests.map((request) => (
-                        <div
-                          key={request.userId._id}
-                          className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="avatar flex-shrink-0">
-                              <div className="w-8 h-8 rounded-full">
-                                <img
-                                  src={request.userId.profilePic}
-                                  alt={request.userId.fullName}
-                                  onError={(e) => {
-                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <span className="text-sm font-medium truncate">
-                              {request.userId.fullName}
-                            </span>
-                          </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                            <button
-                              onClick={() => {
-                                if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
-                                  approveRequestMutation.mutate(request.userId._id);
-                                }
-                              }}
-                              className="btn btn-success btn-xs"
-                              title="Approve"
-                              disabled={approveRequestMutation.isPending}
-                            >
-                              <CheckCircle size={14} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
-                                  rejectRequestMutation.mutate(request.userId._id);
-                                }
-                              }}
-                              className="btn btn-error btn-xs"
-                              title="Reject"
-                              disabled={rejectRequestMutation.isPending}
-                            >
-                              <XCircle size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Members List */}
-                <div className="mb-6">
-                  <h4 className="font-semibold mb-2">
-                    Members ({group.members?.length || 0})
-                  </h4>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {group.members?.map((member) => {
-                      const isAdmin = group.admins?.some(
-                        (admin) => admin._id === member._id
-                      );
-                      const isCreator = group.createdBy?._id === member._id;
-
-                      return (
-                        <div
-                          key={member._id}
-                          className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="avatar flex-shrink-0">
-                              <div className="w-8 h-8 rounded-full">
-                                <img
-                                  src={member.profilePic}
-                                  alt={member.fullName}
-                                  onError={(e) => {
-                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1">
-                                <span className="text-sm font-medium truncate">
-                                  {member.fullName}
-                                </span>
-                                {isCreator && (
-                                  <Crown
-                                    size={14}
-                                    className="flex-shrink-0 text-warning"
-                                    title="Creator"
-                                  />
-                                )}
-                                {isAdmin && !isCreator && (
-                                  <Shield
-                                    size={14}
-                                    className="flex-shrink-0 text-info"
-                                    title="Admin"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {userRole.isAdmin &&
-                            member._id !== authUser._id &&
-                            !isCreator && (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Remove ${member.fullName} from the group?`)) {
-                                    removeMemberMutation.mutate(member._id);
-                                  }
-                                }}
-                                className="btn btn-error btn-xs flex-shrink-0"
-                                title="Remove member"
-                                disabled={removeMemberMutation.isPending}
-                              >
-                                <UserMinus size={14} />
-                              </button>
-                            )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* Tab Content */}
+                {renderSettingsContent()}
 
                 {/* Actions */}
-                <div className="space-y-2">
+                <div className="space-y-2 border-t border-base-300 pt-4 mt-6">
                   {!userRole.isCreator && (
                     <button
                       onClick={() => {
@@ -605,6 +807,23 @@ const GroupChatPage = ({ authUser }) => {
         <AddMembersModal
           group={group}
           onClose={() => setShowAddMembersModal(false)}
+        />
+      )}
+
+      {/* Member Profile Modal */}
+      {selectedMember && (
+        <MemberProfileModal
+          member={selectedMember}
+          group={group}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
+
+      {/* Quick Actions Menu */}
+      {showQuickActions && (
+        <QuickActionsMenu
+          group={group}
+          onClose={() => setShowQuickActions(false)}
         />
       )}
     </div>

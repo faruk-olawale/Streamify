@@ -34,7 +34,6 @@ const userSchema = new mongoose.Schema({
         default: []
     },
 
-    // ENHANCED: Proficiency levels for each language
     proficiencyLevels: {
         type: Map,
         of: {
@@ -51,7 +50,6 @@ const userSchema = new mongoose.Schema({
         default: new Map()
     },
 
-    // ENHANCED: Detailed learning goals per language
     learningGoals: [{
         language: {
             type: String,
@@ -86,14 +84,12 @@ const userSchema = new mongoose.Schema({
         default: "",
     },
 
-    // NEW: User preferences for matching
     matchPreferences: {
         similarLevel: { type: Boolean, default: true },
         goalAlignment: { type: Boolean, default: true },
         activeUsersOnly: { type: Boolean, default: false }
     },
 
-    // NEW: Track user activity for matching
     lastActive: { 
         type: Date, 
         default: Date.now,
@@ -112,7 +108,6 @@ const userSchema = new mongoose.Schema({
         }
     ],
 
-    // STREAK SYSTEM: Practice tracking fields
     practiceHistory: [{
         date: { type: Date, required: true },
         minutesPracticed: { type: Number, default: 0 },
@@ -128,16 +123,97 @@ const userSchema = new mongoose.Schema({
     longestStreak: { type: Number, default: 0 },
     lastPracticeDate: { type: Date },
     
-    dailyGoal: { type: Number, default: 30 }, // minutes
-    todaysPracticeMinutes: { type: Number, default: 0 }
+    dailyGoal: { type: Number, default: 30 },
+    todaysPracticeMinutes: { type: Number, default: 0 },
+
+    // ============================================
+    // NEW FIELDS - ADD THESE
+    // ============================================
+    
+    practiceSchedule: {
+        type: String,
+        maxlength: 200,
+        default: ""
+    },
+
+    practiceGoals: [{
+        id: String,
+        groupId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Group"
+        },
+        type: {
+            type: String,
+            enum: ['daily', 'weekly', 'monthly']
+        },
+        metric: {
+            type: String,
+            enum: ['messages', 'minutes', 'sessions']
+        },
+        target: Number,
+        current: {
+            type: Number,
+            default: 0
+        },
+        startDate: {
+            type: Date,
+            default: Date.now
+        },
+        endDate: Date,
+        status: {
+            type: String,
+            enum: ['active', 'completed', 'failed'],
+            default: 'active'
+        }
+    }],
+
+    status: {
+        type: String,
+        enum: ['available', 'busy', 'dnd', 'away', 'offline'],
+        default: 'available'
+    },
+
+    statusMessage: {
+        type: String,
+        maxlength: 100,
+        default: ""
+    },
+
+    achievements: [{
+        id: String,
+        name: String,
+        description: String,
+        icon: String,
+        earnedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+
+    stats: {
+        totalSessions: {
+            type: Number,
+            default: 0
+        },
+        totalPracticeMinutes: {
+            type: Number,
+            default: 0
+        },
+        totalMessages: {
+            type: Number,
+            default: 0
+        },
+        joinedGroupsCount: {
+            type: Number,
+            default: 0
+        }
+    }
 
 }, {timestamps: true});
 
-// pre hook - MUST come BEFORE mongoose.model()
+// Keep all your existing pre-hooks and methods...
 userSchema.pre("save", async function (next) {
-  // Only hash if password is modified
   if (!this.isModified("password")) return next();
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -147,7 +223,6 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Update lastActive on every save
 userSchema.pre("save", function (next) {
   this.lastActive = new Date();
   next();

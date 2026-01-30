@@ -233,3 +233,71 @@ export const recordPractice = async (data) => {
   return res.data;
 };
 
+// Pinned Messages
+export const pinMessage = async (groupId, messageId) => {
+  const response = await axiosInstance.post(
+    `/api/groups/${groupId}/messages/${messageId}/pin`
+  );
+  return response.data;
+};
+
+export const unpinMessage = async (groupId, messageId) => {
+  const response = await axiosInstance.delete(
+    `/api/groups/${groupId}/messages/${messageId}/pin`
+  );
+  return response.data;
+};
+
+export const getPinnedMessages = async (groupId) => {
+  const response = await axiosInstance.get(
+    `/api/groups/${groupId}/pinned-messages`
+  );
+  return response.data;
+};
+
+// Activity Timeline
+export const getGroupActivity = async (groupId, limit = 20, offset = 0) => {
+  const response = await axiosInstance.get(
+    `/api/groups/${groupId}/activity?limit=${limit}&offset=${offset}`
+  );
+  return response.data;
+};
+
+// Member Profile
+export const getUserProfile = async (userId) => {
+  const response = await axiosInstance.get(`/api/users/${userId}/profile`);
+  return response.data;
+};
+
+// Quick Actions
+export const scheduleVideoSession = async (groupId, sessionData) => {
+  const response = await axiosInstance.post(
+    `/api/groups/${groupId}/sessions`,
+    sessionData
+  );
+  return response.data;
+};
+
+export const createPoll = async (groupId, pollData) => {
+  const response = await axiosInstance.post(
+    `/api/groups/${groupId}/polls`,
+    pollData
+  );
+  return response.data;
+};
+
+export const votePoll = async (groupId, pollId, optionId) => {
+  const response = await axiosInstance.post(
+    `/api/groups/${groupId}/polls/${pollId}/vote`,
+    { optionId }
+  );
+  return response.data;
+};
+
+export const setPracticeGoal = async (groupId, goalData) => {
+  const response = await axiosInstance.post(
+    `/api/groups/${groupId}/goals`,
+    goalData
+  );
+  return response.data;
+};

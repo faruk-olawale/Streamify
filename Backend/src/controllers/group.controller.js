@@ -9,6 +9,7 @@ import {
 } from "../lib/stream.js";
 import User from "../models/User.js";
 import { StreamChat } from "stream-chat";
+import Activity from "../models/activity.model.js";
 
 
 // Create a new group
@@ -615,3 +616,342 @@ export async function getAvailableFriendsForGroup(req, res) {
   }
 }
 
+
+// Pin a message
+export const pinMessage = async (req, res) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    // Check if user is admin
+    const isAdmin = group.admins.some(admin => admin.toString() === userId.toString());
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, message: "Only admins can pin messages" });
+    }
+
+    // Add to pinned messages
+    group.pinnedMessages.push({
+      messageId,
+      pinnedBy: userId,
+      pinnedAt: new Date()
+    });
+    await group.save();
+
+    // Log activity
+    await Activity.create({
+      groupId,
+      type: 'message_pinned',
+      userId,
+      metadata: { messageId }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Message pinned successfully"
+    });
+  } catch (error) {
+    console.error("Error in pinMessage:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Unpin a message
+export const unpinMessage = async (req, res) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    const isAdmin = group.admins.some(admin => admin.toString() === userId.toString());
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, message: "Only admins can unpin messages" });
+    }
+
+    // Remove from pinned messages
+    group.pinnedMessages = group.pinnedMessages.filter(
+      pm => pm.messageId !== messageId
+    );
+    await group.save();
+
+    await Activity.create({
+      groupId,
+      type: 'message_unpinned',
+      userId,
+      metadata: { messageId }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Message unpinned successfully"
+    });
+  } catch (error) {
+    console.error("Error in unpinMessage:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Get pinned messages
+export const getPinnedMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    const group = await Group.findById(groupId)
+      .populate('pinnedMessages.pinnedBy', 'fullName profilePic')
+      .lean();
+
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      pinnedMessages: group.pinnedMessages || []
+    });
+  } catch (error) {
+    console.error("Error in getPinnedMessages:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Get group activity
+export const getGroupActivity = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { limit = 20, offset = 0, type } = req.query;
+
+    const query = { groupId };
+    if (type) query.type = type;
+
+    const activities = await Activity.find(query)
+      .populate('userId', 'fullName profilePic')
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .lean();
+
+    const total = await Activity.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      activities,
+      total,
+      hasMore: total > parseInt(offset) + activities.length
+    });
+  } catch (error) {
+    console.error("Error in getGroupActivity:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Schedule video session
+export const scheduleVideoSession = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { title, date, time, duration, description } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    const scheduledFor = new Date(`${date}T${time}`);
+    
+    const session = {
+      id: Date.now().toString(),
+      title,
+      scheduledFor,
+      duration: parseInt(duration),
+      description,
+      createdBy: userId,
+      attendees: [],
+      meetingLink: `${process.env.CLIENT_URL}/video-call/${groupId}`,
+      createdAt: new Date()
+    };
+
+    group.scheduledSessions.push(session);
+    await group.save();
+
+    await Activity.create({
+      groupId,
+      type: 'session_scheduled',
+      userId,
+      metadata: { sessionId: session.id, title }
+    });
+
+    res.status(200).json({
+      success: true,
+      session
+    });
+  } catch (error) {
+    console.error("Error in scheduleVideoSession:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Create poll
+export const createPoll = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { question, options, allowMultiple, expiresAt } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    const poll = {
+      id: Date.now().toString(),
+      question,
+      options: options.map((opt, index) => ({
+        id: `opt_${index}`,
+        text: opt,
+        votes: []
+      })),
+      allowMultiple: allowMultiple || false,
+      createdBy: userId,
+      createdAt: new Date(),
+      expiresAt: expiresAt ? new Date(expiresAt) : null
+    };
+
+    group.polls.push(poll);
+    await group.save();
+
+    await Activity.create({
+      groupId,
+      type: 'poll_created',
+      userId,
+      metadata: { pollId: poll.id, question }
+    });
+
+    res.status(200).json({
+      success: true,
+      poll
+    });
+  } catch (error) {
+    console.error("Error in createPoll:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Vote on poll
+export const votePoll = async (req, res) => {
+  try {
+    const { groupId, pollId } = req.params;
+    const { optionId } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: "Group not found" });
+    }
+
+    const poll = group.polls.find(p => p.id === pollId);
+    if (!poll) {
+      return res.status(404).json({ success: false, message: "Poll not found" });
+    }
+
+    if (poll.expiresAt && new Date() > poll.expiresAt) {
+      return res.status(400).json({ success: false, message: "Poll has expired" });
+    }
+
+    const option = poll.options.find(o => o.id === optionId);
+    if (!option) {
+      return res.status(404).json({ success: false, message: "Option not found" });
+    }
+
+    // Remove previous votes if not allowing multiple
+    if (!poll.allowMultiple) {
+      poll.options.forEach(opt => {
+        opt.votes = opt.votes.filter(v => v.toString() !== userId.toString());
+      });
+    }
+
+    // Add vote
+    if (!option.votes.includes(userId)) {
+      option.votes.push(userId);
+    }
+
+    await group.save();
+
+    res.status(200).json({
+      success: true,
+      poll
+    });
+  } catch (error) {
+    console.error("Error in votePoll:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Set practice goal
+export const setPracticeGoal = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { type, metric, target } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const goal = {
+      id: Date.now().toString(),
+      groupId,
+      type,
+      metric,
+      target: parseInt(target),
+      current: 0,
+      startDate: new Date(),
+      status: 'active'
+    };
+
+    if (!user.practiceGoals) {
+      user.practiceGoals = [];
+    }
+    user.practiceGoals.push(goal);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      goal
+    });
+  } catch (error) {
+    console.error("Error in setPracticeGoal:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Get user profile (enhanced)
+export const getUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId)
+      .select('-password')
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      profile: user
+    });
+  } catch (error) {
+    console.error("Error in getUserProfile:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
