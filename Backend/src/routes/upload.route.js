@@ -1,55 +1,56 @@
 import express from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 const router = express.Router();
 
-/* =========================
-   Ensure upload directory
-========================= */
-const uploadDir = path.join(process.cwd(), "uploads/voice");
+/* =====================
+   Configure Cloudinary
+===================== */
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-/* =========================
-   Multer config
-========================= */
-const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, uploadDir),
-  filename: (_, file, cb) => {
-    const ext = path.extname(file.originalname) || ".webm";
-    cb(null, `voice-${Date.now()}${ext}`);
+/* =====================
+   Multer Cloudinary Storage
+===================== */
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "streamify/voice",
+    resource_type: "video", // Cloudinary treats audio as 'video'
+    format: "webm", // default format
+    allowed_formats: ["webm", "mp3", "wav", "m4a", "ogg"],
   },
 });
 
-const upload = multer({
+const upload = multer({ 
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB max
 });
 
-/* =========================
+/* =====================
    POST /api/upload/audio
-========================= */
-router.post("/audio", upload.single("audio"), (req, res) => {
+===================== */
+router.post("/audio", upload.single("file"), (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No audio file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ success: false, message: "No audio uploaded" });
 
-    const audioUrl = `${req.protocol}://${req.get("host")}/uploads/voice/${req.file.filename}`;
+    // Cloudinary stores file info in req.file
+    const fileUrl = req.file.path; // Cloudinary URL
 
     res.status(200).json({
       success: true,
-      audioUrl,
+      fileUrl,
       mimeType: req.file.mimetype,
       size: req.file.size,
     });
-  } catch (error) {
-    console.error("Audio upload error:", error);
-    res.status(500).json({ message: "Audio upload failed" });
+  } catch (err) {
+    console.error("Voice upload error:", err);
+    res.status(500).json({ success: false, message: "Audio upload failed" });
   }
 });
 

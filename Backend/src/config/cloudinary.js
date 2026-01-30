@@ -9,42 +9,41 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Log configuration (without exposing secrets)
-console.log("=== CLOUDINARY CONFIG ===");
-console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME);
-console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✓ Set" : "✗ Missing");
-console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✓ Set" : "✗ Missing");
-
-// Configure Multer Storage
-const storage = new CloudinaryStorage({
+// Configure Multer Storage for images and audio
+export const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'streamify/groups',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    transformation: [{ width: 500, height: 500, crop: 'limit' }],
+  params: async (req, file) => {
+    let folder = 'streamify/others';
+    const allowedFormats = [];
+
+    if (file.mimetype.startsWith('image/')) {
+      folder = 'streamify/groups';
+      allowedFormats.push('jpg', 'jpeg', 'png', 'gif', 'webp');
+    } else if (file.mimetype.startsWith('audio/')) {
+      folder = 'streamify/voice';
+      allowedFormats.push('webm', 'mp3', 'wav', 'ogg');
+    }
+
+    return {
+      folder,
+      allowed_formats: allowedFormats,
+      resource_type: file.mimetype.startsWith('audio/') ? 'raw' : 'image',
+    };
   },
 });
 
-export const upload = multer({ 
-  storage: storage,
+export const upload = multer({
+  storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 15 * 1024 * 1024, // 15MB limit
   },
   fileFilter: (req, file, cb) => {
-    console.log("File filter - mimetype:", file.mimetype);
-    
-    // Check file type
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/')) {
       cb(null, true);
     } else {
-      cb(new Error('Not an image! Please upload an image.'), false);
+      cb(new Error('Unsupported file type'), false);
     }
-  }
+  },
 });
-
-// Test Cloudinary connection
-cloudinary.api.ping()
-  .then(() => console.log("✓ Cloudinary connection successful"))
-  .catch((err) => console.error("✗ Cloudinary connection failed:", err.message));
 
 export default cloudinary;

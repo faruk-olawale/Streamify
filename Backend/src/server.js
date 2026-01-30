@@ -11,6 +11,7 @@ import groupRoutes from "./routes/group.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 import matchingRoutes from "./routes/matching.route.js";
 import practiceRoutes from "./routes/practiceRoutes.js";
+import os from "os";
 
 
 
@@ -54,6 +55,23 @@ if (process.env.NODE_ENV === "production") {
         res.sendFile(path.join(__dirname, "../Frontend", "dist", "index.html"));
     });
 }
+
+app.get("/api/server-ip", (req, res) => {
+  const interfaces = os.networkInterfaces();
+  let lanIp = "localhost";
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        lanIp = iface.address;
+        break;
+      }
+    }
+  }
+
+  res.json({ ip: lanIp, port: process.env.PORT || 5001 });
+});
+
 
 app.listen(PORT, () => {
     console.log(`server is running on port ${PORT}`);

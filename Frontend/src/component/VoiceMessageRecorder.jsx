@@ -2,16 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Play, Pause, Send, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
-/* =====================
-   Pick supported format
-===================== */
-const getMimeType = () => {
-  const types = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-  ];
-  return types.find(t => MediaRecorder.isTypeSupported(t));
+const getSupportedMime = () => {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp3", "audio/wav"];
+  return types.find((t) => MediaRecorder.isTypeSupported(t));
 };
 
 const VoiceMessageRecorder = ({ channel, onClose }) => {
@@ -30,23 +23,20 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioURL) URL.revokeObjectURL(audioURL);
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      clearInterval(timerRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      audioURL && URL.revokeObjectURL(audioURL);
     };
   }, [audioURL]);
 
-  /* =====================
-     Record
-  ===================== */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const mimeType = getMimeType();
+      const mimeType = getSupportedMime();
       if (!mimeType) {
-        toast.error("Audio not supported");
+        toast.error("Audio format not supported");
         return;
       }
 
@@ -54,22 +44,22 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
       recorderRef.current = recorder;
       chunksRef.current = [];
 
-      recorder.ondataavailable = e => e.data.size && chunksRef.current.push(e.data);
+      recorder.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
 
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         setAudioURL(URL.createObjectURL(blob));
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach((t) => t.stop());
       };
 
       recorder.start();
       setIsRecording(true);
       setTime(0);
-
-      timerRef.current = setInterval(() => setTime(t => t + 1), 1000);
-    } catch {
-      toast.error("Microphone permission denied");
+      timerRef.current = setInterval(() => setTime((t) => t + 1), 1000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Microphone access denied");
     }
   };
 
@@ -79,76 +69,80 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
     setIsRecording(false);
   };
 
-  /* =====================
-     Playback
-  ===================== */
   const togglePlayback = () => {
     if (!audioRef.current) return;
-    isPlaying ? audioRef.current.pause() : audioRef.current.play();
+    if (isPlaying) audioRef.current.pause();
+    else audioRef.current.play();
     setIsPlaying(!isPlaying);
   };
 
-  /* =====================
-     Upload + Send
-  ===================== */
+  const discardRecording = () => {
+    audioBlob && URL.revokeObjectURL(audioURL);
+    setAudioBlob(null);
+    setAudioURL(null);
+    setIsPlaying(false);
+    setTime(0);
+    chunksRef.current = [];
+  };
+
   const sendVoiceMessage = async () => {
     if (!audioBlob) return;
     setSending(true);
 
     try {
       const form = new FormData();
-      form.append("audio", audioBlob, "voice.webm");
+      form.append("file", audioBlob, "voice.webm");
 
-      const res = await fetch("http://localhost:5001/api/upload/audio", {
+      // Replace with your server IP / domain
+      const res = await fetch("http://<YOUR_SERVER_IP>:5001/api/upload/file", {
         method: "POST",
         body: form,
-        credentials: "include",
       });
 
-
-      const { audioUrl } = await res.json();
+      const data = await res.json();
+      if (!data.success) throw new Error("Upload failed");
 
       await channel.sendMessage({
         text: "",
         attachments: [
           {
             type: "audio",
-            asset_url: audioUrl,
+            asset_url: data.fileUrl,
             mime_type: audioBlob.type,
           },
         ],
       });
 
-      toast.success("Voice message sent");
+      toast.success("Voice message sent!");
       onClose();
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Upload failed");
       setSending(false);
     }
   };
 
-  const format = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  /* =====================
-     UI
-  ===================== */
   return (
-    <div className="p-4 bg-base-200 border-t">
+    <div className="p-4 bg-base-200 border-t shadow-lg">
       <div className="flex justify-between mb-3">
-        <span>Voice Message</span>
-        <button onClick={onClose}><X /></button>
+        <span className="font-semibold">Voice Message</span>
+        <button onClick={onClose}>
+          <X />
+        </button>
       </div>
 
       {!audioURL ? (
         <div className="text-center space-y-3">
-          <div className="text-3xl font-mono">{format(time)}</div>
+          <div className="text-3xl font-mono">{formatTime(time)}</div>
           {!isRecording ? (
             <button className="btn btn-circle btn-primary" onClick={startRecording}>
-              <Mic />
+              <Mic size={28} />
             </button>
           ) : (
             <button className="btn btn-circle btn-error" onClick={stopRecording}>
-              <Square />
+              <Square size={28} />
             </button>
           )}
         </div>
@@ -158,22 +152,23 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
             <source src={audioURL} type={audioBlob.type} />
           </audio>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mt-3">
             <button className="btn btn-circle btn-primary" onClick={togglePlayback}>
               {isPlaying ? <Pause /> : <Play />}
             </button>
-            <span>{format(time)}</span>
-            <button className="btn btn-ghost" onClick={() => setAudioURL(null)}>
+            <span className="font-mono">{formatTime(time)}</span>
+            <button className="btn btn-ghost" onClick={discardRecording}>
               <Trash2 />
             </button>
           </div>
 
           <button
-            className="btn btn-primary w-full mt-3"
+            className="btn btn-primary w-full mt-3 flex items-center justify-center gap-2"
             onClick={sendVoiceMessage}
             disabled={sending}
           >
-            {sending ? "Sending..." : <><Send /> Send</>}
+            {sending ? "Sending..." : <Send size={20} />}
+            {!sending && "Send"}
           </button>
         </>
       )}
