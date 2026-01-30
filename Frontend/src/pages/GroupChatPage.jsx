@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -39,23 +39,15 @@ import {
   Edit,
   X,
   Mic,
-  StopCircle,
-  Play,
-  Pause,
   Pin,
   Search,
-  Calendar,
-  BarChart3,
-  MessageSquare,
   Image as ImageIcon,
   FileText,
-  Video,
-  Volume2,
-  Send,
-  MoreVertical,
-  Clock,
   TrendingUp,
   Zap,
+  Sparkles,
+  MoreVertical,
+  Hash,
 } from "lucide-react";
 import EditGroupModal from "../component/EditGroupModal";
 import AddMembersModal from "../component/AddMembersModal";
@@ -78,7 +70,7 @@ const GroupChatPage = ({ authUser }) => {
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState("about"); // about, media, files, activity
+  const [activeSettingsTab, setActiveSettingsTab] = useState("about");
   const queryClient = useQueryClient();
 
   // Fetch group details
@@ -140,7 +132,6 @@ const GroupChatPage = ({ authUser }) => {
 
     return () => {
       isMounted = false;
-      // Only stop watching the channel, don't disconnect client
       if (activeChannel) {
         activeChannel.stopWatching().catch(console.error);
       }
@@ -148,7 +139,7 @@ const GroupChatPage = ({ authUser }) => {
     };
   }, [client, group, userRole]);
 
-  // Request to join mutation
+  // Mutations
   const requestJoinMutation = useMutation({
     mutationFn: () => requestJoinGroup(groupId),
     onSuccess: () => {
@@ -160,7 +151,6 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  // Approve request mutation
   const approveRequestMutation = useMutation({
     mutationFn: (userId) => approveJoinRequest(groupId, userId),
     onSuccess: () => {
@@ -172,7 +162,6 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  // Reject request mutation
   const rejectRequestMutation = useMutation({
     mutationFn: (userId) => rejectJoinRequest(groupId, userId),
     onSuccess: () => {
@@ -184,7 +173,6 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  // Remove member mutation
   const removeMemberMutation = useMutation({
     mutationFn: (userId) => removeMember(groupId, userId),
     onSuccess: () => {
@@ -196,7 +184,6 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  // Leave group mutation
   const leaveGroupMutation = useMutation({
     mutationFn: () => leaveGroup(groupId),
     onSuccess: () => {
@@ -209,7 +196,6 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
-  // Delete group mutation
   const deleteGroupMutation = useMutation({
     mutationFn: () => deleteGroup(groupId),
     onSuccess: () => {
@@ -225,18 +211,34 @@ const GroupChatPage = ({ authUser }) => {
 
   if (loadingGroup || isConnecting) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-base-100 via-base-200 to-base-100">
+        <div className="text-center">
+          <div className="relative">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+            <div className="absolute inset-0 loading loading-spinner loading-lg text-secondary opacity-30 scale-125"></div>
+          </div>
+          <p className="mt-4 text-sm text-base-content/60 font-medium">Loading group...</p>
+        </div>
       </div>
     );
   }
 
   if (!group) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center p-4">
-          <h2 className="text-xl md:text-2xl font-bold mb-2">Group not found</h2>
-          <button onClick={() => navigate("/groups")} className="btn btn-primary btn-sm md:btn-md">
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-base-100 via-base-200 to-base-100">
+        <div className="text-center p-8 max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-error/10 flex items-center justify-center">
+            <Users size={40} className="text-error/50" />
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-r from-base-content to-base-content/60 bg-clip-text text-transparent">
+            Group not found
+          </h2>
+          <p className="text-base-content/60 mb-6">This group doesn't exist or has been deleted.</p>
+          <button 
+            onClick={() => navigate("/groups")} 
+            className="btn btn-primary gap-2 shadow-lg hover:shadow-xl transition-all"
+          >
+            <ArrowLeft size={18} />
             Back to Groups
           </button>
         </div>
@@ -252,251 +254,298 @@ const GroupChatPage = ({ authUser }) => {
     switch (activeSettingsTab) {
       case "about":
         return (
-          <>
-            {/* Group Info */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold">About</h4>
-                {userRole.isAdmin && (
-                  <button
-                    onClick={() => {
-                      setShowEditModal(true);
-                      setShowSettings(false);
-                    }}
-                    className="btn btn-ghost btn-xs gap-1"
-                  >
-                    <Edit size={14} />
-                    Edit
-                  </button>
-                )}
-              </div>
-              
-              {/* Group Image */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="avatar">
-                  <div className="w-16 h-16 rounded-lg">
-                    <img 
-                      src={group.image || "https://via.placeholder.com/150?text=Group"} 
-                      alt={group.name}
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+          <div className="space-y-6 animate-fadeIn">
+            {/* Enhanced Group Info Card */}
+            <div className="card bg-gradient-to-br from-base-100 to-base-200/50 shadow-md border border-base-300/50">
+              <div className="card-body p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-lg flex items-center gap-2">
+                    <Hash size={20} className="text-primary" />
+                    About Group
+                  </h4>
+                  {userRole.isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowEditModal(true);
+                        setShowSettings(false);
                       }}
-                    />
+                      className="btn btn-ghost btn-sm gap-2 hover:bg-primary/10 hover:text-primary transition-all"
+                    >
+                      <Edit size={16} />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
+                  )}
+                </div>
+                
+                {/* Group Image & Info */}
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="avatar">
+                    <div className="w-20 h-20 rounded-2xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-100">
+                      <img 
+                        src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                        alt={group.name}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random&bold=true`;
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-bold text-xl mb-1 truncate">{group.name}</h5>
+                    <div className="flex items-center gap-3 text-sm text-base-content/60 mb-2">
+                      <div className="flex items-center gap-1">
+                        <Users size={14} />
+                        <span className="font-medium">{group.members?.length || 0} members</span>
+                      </div>
+                      {group.createdAt && (
+                        <div className="flex items-center gap-1">
+                          <span>•</span>
+                          <span>Created {new Date(group.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h5 className="font-semibold truncate">{group.name}</h5>
-                  <p className="text-xs text-base-content/60">
-                    {group.members?.length || 0} members
-                  </p>
+                
+                {group.description && (
+                  <div className="p-3 bg-base-200/50 rounded-lg border border-base-300/30">
+                    <p className="text-sm text-base-content/80 leading-relaxed">
+                      {group.description}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2 mt-3 p-3 bg-warning/5 rounded-lg border border-warning/10">
+                  <Crown size={16} className="text-warning flex-shrink-0" />
+                  <span className="text-sm text-base-content/70">
+                    Created by <span className="font-semibold text-base-content">{group.createdBy?.fullName}</span>
+                  </span>
                 </div>
-              </div>
-              
-              <p className="text-sm text-base-content/70 mb-2">
-                {group.description || "No description"}
-              </p>
-              
-              <div className="flex items-center gap-2 text-sm text-base-content/60">
-                <Crown size={14} className="text-warning flex-shrink-0" />
-                <span className="truncate">Created by {group.createdBy?.fullName}</span>
               </div>
             </div>
 
             {/* Add Members Button (Admin Only) */}
             {userRole.isAdmin && (
-              <div className="mb-6">
-                <button
-                  onClick={() => {
-                    setShowAddMembersModal(true);
-                    setShowSettings(false);
-                  }}
-                  className="btn btn-primary btn-block gap-2"
-                >
-                  <UserPlus size={18} />
-                  Add Members
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setShowAddMembersModal(true);
+                  setShowSettings(false);
+                }}
+                className="btn btn-primary btn-block gap-2 shadow-md hover:shadow-lg transition-all"
+              >
+                <UserPlus size={20} />
+                Add Members
+                <Sparkles size={16} className="opacity-60" />
+              </button>
             )}
 
             {/* Pending Requests (Admin Only) */}
             {userRole.isAdmin && group.pendingRequests?.length > 0 && (
-              <div className="mb-6">
-                <h4 className="font-semibold mb-2">
-                  Pending Requests ({group.pendingRequests.length})
-                </h4>
-                <div className="space-y-2">
-                  {group.pendingRequests.map((request) => (
-                    <div
-                      key={request.userId._id}
-                      className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2"
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="avatar flex-shrink-0">
-                          <div className="w-8 h-8 rounded-full">
-                            <img
-                              src={request.userId.profilePic}
-                              alt={request.userId.fullName}
-                              onError={(e) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
-                              }}
-                            />
+              <div className="card bg-info/5 border border-info/20 shadow-sm">
+                <div className="card-body p-5">
+                  <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
+                    <div className="badge badge-info gap-1">
+                      {group.pendingRequests.length}
+                    </div>
+                    Pending Requests
+                  </h4>
+                  <div className="space-y-2">
+                    {group.pendingRequests.map((request) => (
+                      <div
+                        key={request.userId._id}
+                        className="flex items-center justify-between p-3 bg-base-100 rounded-xl border border-base-300/50 gap-3 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="avatar">
+                            <div className="w-10 h-10 rounded-full ring-2 ring-primary/20">
+                              <img
+                                src={request.userId.profilePic}
+                                alt={request.userId.fullName}
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{request.userId.fullName}</p>
+                            <p className="text-xs text-base-content/50">Wants to join</p>
                           </div>
                         </div>
-                        <span className="text-sm font-medium truncate">
-                          {request.userId.fullName}
-                        </span>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
+                                approveRequestMutation.mutate(request.userId._id);
+                              }
+                            }}
+                            className="btn btn-success btn-sm gap-1 shadow-sm hover:shadow-md transition-all"
+                            disabled={approveRequestMutation.isPending}
+                          >
+                            <CheckCircle size={16} />
+                            <span className="hidden sm:inline">Approve</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
+                                rejectRequestMutation.mutate(request.userId._id);
+                              }
+                            }}
+                            className="btn btn-error btn-sm gap-1 shadow-sm hover:shadow-md transition-all"
+                            disabled={rejectRequestMutation.isPending}
+                          >
+                            <XCircle size={16} />
+                            <span className="hidden sm:inline">Reject</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => {
-                            if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
-                              approveRequestMutation.mutate(request.userId._id);
-                            }
-                          }}
-                          className="btn btn-success btn-xs"
-                          title="Approve"
-                          disabled={approveRequestMutation.isPending}
-                        >
-                          <CheckCircle size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
-                              rejectRequestMutation.mutate(request.userId._id);
-                            }
-                          }}
-                          className="btn btn-error btn-xs"
-                          title="Reject"
-                          disabled={rejectRequestMutation.isPending}
-                        >
-                          <XCircle size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Members List */}
-            <div className="mb-6">
-              <h4 className="font-semibold mb-2">
-                Members ({group.members?.length || 0})
-              </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {group.members?.map((member) => {
-                  const isAdmin = group.admins?.some(
-                    (admin) => admin._id === member._id
-                  );
-                  const isCreator = group.createdBy?._id === member._id;
+            <div className="card bg-base-100 border border-base-300/50 shadow-sm">
+              <div className="card-body p-5">
+                <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
+                  <Users size={20} className="text-primary" />
+                  Members
+                  <div className="badge badge-primary badge-sm">{group.members?.length || 0}</div>
+                </h4>
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                  {group.members?.map((member) => {
+                    const isAdmin = group.admins?.some(
+                      (admin) => admin._id === member._id
+                    );
+                    const isCreator = group.createdBy?._id === member._id;
 
-                  return (
-                    <div
-                      key={member._id}
-                      className="flex items-center justify-between p-2 bg-base-100 rounded-lg gap-2 hover:bg-base-200 transition-colors cursor-pointer"
-                      onClick={() => setSelectedMember(member)}
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="avatar flex-shrink-0">
-                          <div className="w-8 h-8 rounded-full">
-                            <img
-                              src={member.profilePic}
-                              alt={member.fullName}
-                              onError={(e) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                    return (
+                      <div
+                        key={member._id}
+                        className="flex items-center justify-between p-3 bg-base-200/30 rounded-xl gap-3 hover:bg-base-200/60 hover:shadow-md transition-all cursor-pointer group"
+                        onClick={() => setSelectedMember(member)}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="avatar">
+                            <div className="w-11 h-11 rounded-full ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all">
+                              <img
+                                src={member.profilePic}
+                                alt={member.fullName}
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold truncate">
+                                {member.fullName}
+                              </span>
+                              {isCreator && (
+                                <div className="badge badge-warning badge-sm gap-1">
+                                  <Crown size={10} />
+                                  Creator
+                                </div>
+                              )}
+                              {isAdmin && !isCreator && (
+                                <div className="badge badge-info badge-sm gap-1">
+                                  <Shield size={10} />
+                                  Admin
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+                              <span className="text-xs text-base-content/50">Online</span>
+                            </div>
+                          </div>
+                        </div>
+                        {userRole.isAdmin &&
+                          member._id !== authUser._id &&
+                          !isCreator && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Remove ${member.fullName} from the group?`)) {
+                                  removeMemberMutation.mutate(member._id);
+                                }
                               }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm font-medium truncate">
-                              {member.fullName}
-                            </span>
-                            {isCreator && (
-                              <Crown
-                                size={14}
-                                className="flex-shrink-0 text-warning"
-                                title="Creator"
-                              />
-                            )}
-                            {isAdmin && !isCreator && (
-                              <Shield
-                                size={14}
-                                className="flex-shrink-0 text-info"
-                                title="Admin"
-                              />
-                            )}
-                          </div>
-                          {/* Member status indicator */}
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-success"></span>
-                            <span className="text-xs text-base-content/50">Available to practice</span>
-                          </div>
-                        </div>
+                              className="btn btn-error btn-xs gap-1 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                              disabled={removeMemberMutation.isPending}
+                            >
+                              <UserMinus size={12} />
+                              Remove
+                            </button>
+                          )}
                       </div>
-                      {userRole.isAdmin &&
-                        member._id !== authUser._id &&
-                        !isCreator && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Remove ${member.fullName} from the group?`)) {
-                                removeMemberMutation.mutate(member._id);
-                              }
-                            }}
-                            className="btn btn-error btn-xs flex-shrink-0"
-                            title="Remove member"
-                            disabled={removeMemberMutation.isPending}
-                          >
-                            <UserMinus size={14} />
-                          </button>
-                        )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </>
+          </div>
         );
 
       case "media":
         return (
-          <div className="space-y-4">
-            <h4 className="font-semibold">Media Gallery</h4>
-            <p className="text-sm text-base-content/60">All images and videos shared in this group</p>
+          <div className="space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2 mb-2">
+              <ImageIcon size={20} className="text-primary" />
+              <h4 className="font-bold text-lg">Media Gallery</h4>
+            </div>
+            <p className="text-sm text-base-content/60 mb-4">All images and videos shared in this group</p>
             
-            {/* Media Grid - Mock data for now */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* Enhanced Media Grid */}
+            <div className="grid grid-cols-3 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="aspect-square bg-base-300 rounded-lg animate-pulse"></div>
+                <div 
+                  key={i} 
+                  className="aspect-square bg-gradient-to-br from-base-300 to-base-200 rounded-xl animate-pulse shadow-inner border border-base-300/50"
+                ></div>
               ))}
             </div>
             
-            <div className="text-center py-4">
-              <p className="text-sm text-base-content/50">No media shared yet</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <ImageIcon size={32} className="text-primary/50" />
+              </div>
+              <p className="text-sm text-base-content/50 font-medium">No media shared yet</p>
+              <p className="text-xs text-base-content/40 mt-1">Share photos and videos in the chat</p>
             </div>
           </div>
         );
 
       case "files":
         return (
-          <div className="space-y-4">
-            <h4 className="font-semibold">Shared Files</h4>
-            <p className="text-sm text-base-content/60">All documents shared in this group</p>
+          <div className="space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={20} className="text-primary" />
+              <h4 className="font-bold text-lg">Shared Files</h4>
+            </div>
+            <p className="text-sm text-base-content/60 mb-4">All documents shared in this group</p>
             
-            {/* Files List - Mock data */}
+            {/* Enhanced Files List */}
             <div className="space-y-2">
               {[
-                { name: "Spanish_Grammar_Guide.pdf", size: "2.4 MB", date: "2 days ago" },
-                { name: "Vocabulary_List.docx", size: "150 KB", date: "1 week ago" },
+                { name: "Spanish_Grammar_Guide.pdf", size: "2.4 MB", date: "2 days ago", color: "error" },
+                { name: "Vocabulary_List.docx", size: "150 KB", date: "1 week ago", color: "info" },
               ].map((file, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-base-100 rounded-lg hover:bg-base-200 transition-colors cursor-pointer">
-                  <FileText size={20} className="text-primary flex-shrink-0" />
+                <div 
+                  key={i} 
+                  className="flex items-center gap-4 p-4 bg-base-200/50 rounded-xl border border-base-300/50 hover:bg-base-200 hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <div className={`p-3 bg-${file.color}/10 rounded-lg border border-${file.color}/20 group-hover:scale-110 transition-transform`}>
+                    <FileText size={24} className={`text-${file.color}`} />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-sm font-semibold truncate mb-0.5">{file.name}</p>
                     <p className="text-xs text-base-content/50">{file.size} • {file.date}</p>
                   </div>
+                  <button className="btn btn-ghost btn-sm btn-circle opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MoreVertical size={16} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -504,7 +553,7 @@ const GroupChatPage = ({ authUser }) => {
         );
 
       case "activity":
-        return <ActivityTimelinePanel group={group} />;
+        return <ActivityTimelinePanel group={group} groupId={groupId} />;
 
       default:
         return null;
@@ -512,62 +561,67 @@ const GroupChatPage = ({ authUser }) => {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-base-100 overflow-hidden">
-      {/* Header */}
-      <div className="bg-base-200 p-3 md:p-4 flex items-center justify-between border-b border-base-300 flex-shrink-0">
-        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+    <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-base-100 via-base-200/30 to-base-100 overflow-hidden">
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-base-200/80 to-base-300/50 backdrop-blur-xl p-4 flex items-center justify-between border-b-2 border-primary/10 shadow-lg flex-shrink-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             onClick={() => navigate("/groups")}
-            className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+            className="btn btn-ghost btn-sm btn-circle hover:bg-primary/10 hover:text-primary transition-all"
           >
-            <ArrowLeft size={18} className="md:w-5 md:h-5" />
+            <ArrowLeft size={20} />
           </button>
-          <div className="avatar flex-shrink-0">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg">
+          <div className="avatar">
+            <div className="w-12 h-12 rounded-2xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-200">
               <img 
                 src={group.image || "https://via.placeholder.com/150?text=Group"} 
                 alt={group.name}
                 onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`;
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random&bold=true`;
                 }}
               />
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-sm md:text-lg truncate">{group.name}</h2>
-            <p className="text-xs md:text-sm text-base-content/60">
-              {group.members?.length || 0} {group.members?.length === 1 ? 'member' : 'members'}
-            </p>
+            <h2 className="font-bold text-lg truncate flex items-center gap-2">
+              {group.name}
+              {userRole?.isAdmin && (
+                <Shield size={16} className="text-warning" />
+              )}
+            </h2>
+            <div className="flex items-center gap-2 text-xs text-base-content/60">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                <span>{group.members?.length || 0} members</span>
+              </div>
+            </div>
           </div>
         </div>
 
         {userRole?.isMember && (
-          <div className="flex items-center gap-1 md:gap-2">
-            {/* Search Button */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+              className={`btn btn-sm btn-circle ${showSearch ? 'btn-primary' : 'btn-ghost'} hover:scale-110 transition-all shadow-sm`}
               title="Search messages"
             >
-              <Search size={18} className="md:w-5 md:h-5" />
+              <Search size={18} />
             </button>
 
-            {/* Pinned Messages Button */}
             <button
               onClick={() => setShowPinnedMessages(!showPinnedMessages)}
-              className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+              className={`btn btn-sm btn-circle ${showPinnedMessages ? 'btn-warning' : 'btn-ghost'} hover:scale-110 transition-all shadow-sm`}
               title="Pinned messages"
             >
-              <Pin size={18} className="md:w-5 md:h-5" />
+              <Pin size={18} />
             </button>
 
-            {/* Settings Button */}
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="btn btn-ghost btn-sm gap-1 md:gap-2 flex-shrink-0"
+              className={`btn btn-sm gap-2 ${showSettings ? 'btn-primary' : 'btn-ghost'} hover:scale-105 transition-all shadow-sm`}
             >
-              <Settings size={18} className="md:w-5 md:h-5" />
-              {userRole.isAdmin && <Shield size={14} className="md:w-4 md:h-4 text-warning" />}
+              <Settings size={18} />
+              <span className="hidden md:inline text-xs font-medium">Settings</span>
             </button>
           </div>
         )}
@@ -577,32 +631,40 @@ const GroupChatPage = ({ authUser }) => {
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-h-0">
           {!userRole?.isMember ? (
-            <div className="flex-1 flex items-center justify-center p-4">
-              <div className="text-center max-w-md">
-                <Users size={48} className="md:w-16 md:h-16 mx-auto text-base-content/30 mb-4" />
-                <h3 className="text-lg md:text-xl font-bold mb-2">Join this group</h3>
-                <p className="text-sm md:text-base text-base-content/60 mb-6">
-                  {group.description || "No description available"}
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center max-w-lg">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center shadow-xl">
+                  <Users size={48} className="text-primary" />
+                </div>
+                <h3 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  Join this group
+                </h3>
+                <p className="text-base-content/60 mb-8 leading-relaxed">
+                  {group.description || "Connect with other language learners and start practicing together!"}
                 </p>
                 {isPending ? (
-                  <div className="alert alert-info text-sm">
-                    <span>Your join request is pending approval</span>
+                  <div className="alert alert-info shadow-lg">
+                    <div>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      <span className="font-medium">Your join request is pending approval</span>
+                    </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => requestJoinMutation.mutate()}
-                    className="btn btn-primary btn-sm md:btn-md gap-2"
+                    className="btn btn-primary btn-lg gap-3 shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
                     disabled={requestJoinMutation.isPending}
                   >
                     {requestJoinMutation.isPending ? (
                       <>
                         <span className="loading loading-spinner loading-sm"></span>
-                        Sending...
+                        Sending Request...
                       </>
                     ) : (
                       <>
-                        <UserPlus size={18} className="md:w-5 md:h-5" />
+                        <UserPlus size={24} />
                         Request to Join
+                        <Sparkles size={20} className="opacity-60" />
                       </>
                     )}
                   </button>
@@ -611,24 +673,20 @@ const GroupChatPage = ({ authUser }) => {
             </div>
           ) : client && channel ? (
             <>
-              {/* Pinned Messages Panel */}
               {showPinnedMessages && (
-                <div className="bg-base-200 border-b border-base-300">
-                  <PinnedMessagesPanel
-                    channel={channel}
-                    onClose={() => setShowPinnedMessages(false)}
-                  />
-                </div>
+                <PinnedMessagesPanel
+                  channel={channel}
+                  groupId={groupId}
+                  userRole={userRole}
+                  onClose={() => setShowPinnedMessages(false)}
+                />
               )}
 
-              {/* Search Panel */}
               {showSearch && (
-                <div className="bg-base-200 border-b border-base-300">
-                  <MessageSearchPanel
-                    channel={channel}
-                    onClose={() => setShowSearch(false)}
-                  />
-                </div>
+                <MessageSearchPanel
+                  channel={channel}
+                  onClose={() => setShowSearch(false)}
+                />
               )}
 
               <div className="flex-1 min-h-0 overflow-hidden relative">
@@ -639,19 +697,34 @@ const GroupChatPage = ({ authUser }) => {
                       <MessageList />
                       <TypingIndicator />
                       
-                      {/* Custom Message Input Area with Voice */}
-                      <div className="relative">
-                        <MessageInput />
-                        <button
-                          onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                          className="absolute right-2 bottom-2 btn btn-circle btn-sm btn-ghost"
-                          title="Send voice message"
-                        >
-                          <Mic size={18} />
-                        </button>
+                      <div style={{ position: 'relative' }}>
+                    <MessageInput />
+                    
+                    <button
+                      onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                      className={`btn btn-circle ${showVoiceRecorder ? 'btn-error' : 'btn-ghost hover:btn-primary'}`}
+                      title="Send voice message"
+                      type="button"
+                      style={{
+                        position: 'absolute',
+                        right: '60px',      // ← Positions it left of Send button
+                        bottom: '8px',
+                        zIndex: 10,
+                        width: '40px',      // ← Same size as Send button
+                        height: '40px'
+                      }}
+                    >
+                      <Mic size={20} />
+                    </button>
+
+                    {showVoiceRecorder && (
+                      <VoiceMessageRecorder
+                        channel={channel}
+                        onClose={() => setShowVoiceRecorder(false)}
+                      />
+                    )}
                       </div>
 
-                      {/* Voice Recorder */}
                       {showVoiceRecorder && (
                         <VoiceMessageRecorder
                           channel={channel}
@@ -663,97 +736,89 @@ const GroupChatPage = ({ authUser }) => {
                   </Channel>
                 </Chat>
 
-                {/* Floating Quick Actions Button */}
-                <div className="absolute bottom-20 right-4 z-10">
+                {/* Enhanced Floating Quick Actions Button */}
+                <div className="absolute bottom-24 right-6 z-10">
                   <button
                     onClick={() => setShowQuickActions(!showQuickActions)}
-                    className="btn btn-primary btn-circle btn-lg shadow-lg hover:shadow-xl transition-shadow"
+                    className="btn btn-circle btn-lg bg-gradient-to-br from-primary via-secondary to-primary shadow-2xl hover:shadow-3xl hover:scale-110 transition-all border-2 border-white/20 group"
                   >
-                    <Zap size={24} />
+                    <Zap size={28} className="group-hover:rotate-12 transition-transform" />
                   </button>
                 </div>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <span className="loading loading-spinner loading-lg"></span>
+              <div className="text-center">
+                <span className="loading loading-spinner loading-lg text-primary"></span>
+                <p className="mt-4 text-sm text-base-content/60">Connecting to chat...</p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Settings Sidebar - Mobile Drawer / Desktop Sidebar */}
+        {/* Enhanced Settings Sidebar */}
         {showSettings && userRole?.isMember && (
           <>
-            {/* Mobile Overlay */}
             <div 
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
               onClick={() => setShowSettings(false)}
             ></div>
             
-            {/* Settings Panel */}
             <div className={`
               fixed lg:relative
               top-0 right-0 bottom-0
-              w-full sm:w-96 lg:w-80
-              bg-base-200 
-              border-l border-base-300 
+              w-full sm:w-[420px] lg:w-96
+              bg-gradient-to-b from-base-200 to-base-100
+              border-l-2 border-primary/10
               overflow-y-auto
               z-50
-              transform transition-transform duration-300
+              shadow-2xl
+              transform transition-all duration-300 ease-out
               ${showSettings ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
             `}>
-              <div className="p-4">
-                {/* Mobile Close Button */}
-                <div className="flex items-center justify-between mb-4 lg:hidden">
-                  <h3 className="font-bold text-lg">Group Settings</h3>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6 lg:hidden">
+                  <h3 className="font-bold text-2xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    Group Settings
+                  </h3>
                   <button
                     onClick={() => setShowSettings(false)}
-                    className="btn btn-ghost btn-sm btn-circle"
+                    className="btn btn-ghost btn-sm btn-circle hover:bg-error/10 hover:text-error"
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                {/* Desktop Title */}
-                <h3 className="font-bold text-lg mb-4 hidden lg:block">Group Settings</h3>
+                <h3 className="font-bold text-2xl mb-6 hidden lg:block bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  Group Settings
+                </h3>
 
-                {/* Settings Tabs */}
-                <div className="tabs tabs-boxed mb-4">
-                  <button
-                    className={`tab ${activeSettingsTab === "about" ? "tab-active" : ""}`}
-                    onClick={() => setActiveSettingsTab("about")}
-                  >
-                    <Users size={14} className="mr-1" />
-                    About
-                  </button>
-                  <button
-                    className={`tab ${activeSettingsTab === "media" ? "tab-active" : ""}`}
-                    onClick={() => setActiveSettingsTab("media")}
-                  >
-                    <ImageIcon size={14} className="mr-1" />
-                    Media
-                  </button>
-                  <button
-                    className={`tab ${activeSettingsTab === "files" ? "tab-active" : ""}`}
-                    onClick={() => setActiveSettingsTab("files")}
-                  >
-                    <FileText size={14} className="mr-1" />
-                    Files
-                  </button>
-                  <button
-                    className={`tab ${activeSettingsTab === "activity" ? "tab-active" : ""}`}
-                    onClick={() => setActiveSettingsTab("activity")}
-                  >
-                    <TrendingUp size={14} className="mr-1" />
-                    Activity
-                  </button>
+                {/* Enhanced Tabs */}
+                <div className="tabs tabs-boxed mb-6 p-1 bg-base-300/50 backdrop-blur-sm">
+                  {[
+                    { id: "about", icon: Users, label: "About" },
+                    { id: "media", icon: ImageIcon, label: "Media" },
+                    { id: "files", icon: FileText, label: "Files" },
+                    { id: "activity", icon: TrendingUp, label: "Activity" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      className={`tab gap-2 flex-1 ${
+                        activeSettingsTab === tab.id ? "tab-active" : ""
+                      } transition-all`}
+                      onClick={() => setActiveSettingsTab(tab.id)}
+                    >
+                      <tab.icon size={14} />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  ))}
                 </div>
 
-                {/* Tab Content */}
                 {renderSettingsContent()}
 
-                {/* Actions */}
-                <div className="space-y-2 border-t border-base-300 pt-4 mt-6">
+                {/* Enhanced Action Buttons */}
+                <div className="space-y-3 border-t-2 border-base-300/50 pt-6 mt-8">
                   {!userRole.isCreator && (
                     <button
                       onClick={() => {
@@ -761,10 +826,10 @@ const GroupChatPage = ({ authUser }) => {
                           leaveGroupMutation.mutate();
                         }
                       }}
-                      className="btn btn-warning btn-block gap-2 btn-sm md:btn-md"
+                      className="btn btn-warning btn-block gap-2 shadow-md hover:shadow-lg transition-all"
                       disabled={leaveGroupMutation.isPending}
                     >
-                      <LogOut size={16} className="md:w-[18px] md:h-[18px]" />
+                      <LogOut size={18} />
                       Leave Group
                     </button>
                   )}
@@ -780,10 +845,10 @@ const GroupChatPage = ({ authUser }) => {
                           deleteGroupMutation.mutate();
                         }
                       }}
-                      className="btn btn-error btn-block gap-2 btn-sm md:btn-md"
+                      className="btn btn-error btn-block gap-2 shadow-md hover:shadow-lg transition-all"
                       disabled={deleteGroupMutation.isPending}
                     >
-                      <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
+                      <Trash2 size={18} />
                       Delete Group
                     </button>
                   )}
@@ -794,7 +859,7 @@ const GroupChatPage = ({ authUser }) => {
         )}
       </div>
 
-      {/* Edit Group Modal */}
+      {/* Modals */}
       {showEditModal && (
         <EditGroupModal
           group={group}
@@ -802,7 +867,6 @@ const GroupChatPage = ({ authUser }) => {
         />
       )}
 
-      {/* Add Members Modal */}
       {showAddMembersModal && userRole.isAdmin && (
         <AddMembersModal
           group={group}
@@ -810,7 +874,6 @@ const GroupChatPage = ({ authUser }) => {
         />
       )}
 
-      {/* Member Profile Modal */}
       {selectedMember && (
         <MemberProfileModal
           member={selectedMember}
@@ -819,13 +882,49 @@ const GroupChatPage = ({ authUser }) => {
         />
       )}
 
-      {/* Quick Actions Menu */}
       {showQuickActions && (
         <QuickActionsMenu
           group={group}
           onClose={() => setShowQuickActions(false)}
         />
       )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--p) / 0.3);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--p) / 0.5);
+        }
+      `}</style>
+            <style jsx global>{`
+        .str-chat__input-flat {
+          padding-right: 110px !important;
+        }
+        
+        /* Your existing styles... */
+        @keyframes fadeIn { ... }
+      `}</style>
     </div>
   );
 };
