@@ -35,6 +35,7 @@ app.use("/api/users", userRoutes);  // Keep only this one
 app.use("/api/chat", chatRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/matching", matchingRoutes);
 app.use("/api/practice", practiceRoutes);
 

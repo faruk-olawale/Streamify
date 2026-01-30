@@ -1,24 +1,56 @@
 import express from "express";
-import { protectRoute } from "../middleware/auth.middleware.js";
-import { upload } from "../config/cloudinary.js";
-import { uploadGroupImage } from "../controllers/upload.controller.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = express.Router();
 
-// Add error handling for multer
-router.post("/group-image", protectRoute, (req, res, next) => {
-  upload.single("image")(req, res, (err) => {
-    if (err) {
-      console.error("=== MULTER ERROR ===");
-      console.error("Error:", err.message);
-      console.error("Stack:", err.stack);
-      
-      return res.status(400).json({ 
-        message: "File upload error: " + err.message 
-      });
+/* =========================
+   Ensure upload directory
+========================= */
+const uploadDir = path.join(process.cwd(), "uploads/voice");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+/* =========================
+   Multer config
+========================= */
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, uploadDir),
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname) || ".webm";
+    cb(null, `voice-${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+});
+
+/* =========================
+   POST /api/upload/audio
+========================= */
+router.post("/audio", upload.single("audio"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No audio file uploaded" });
     }
-    next();
-  });
-}, uploadGroupImage);
+
+    const audioUrl = `${req.protocol}://${req.get("host")}/uploads/voice/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      audioUrl,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+  } catch (error) {
+    console.error("Audio upload error:", error);
+    res.status(500).json({ message: "Audio upload failed" });
+  }
+});
 
 export default router;
