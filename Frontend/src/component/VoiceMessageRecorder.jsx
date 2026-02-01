@@ -3,7 +3,7 @@ import { Mic, Square, Play, Pause, Send, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 
-const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
+const VoiceMessageRecorder = ({ channel, sendMessage, onClose }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioURL, setAudioURL] = useState(null);
@@ -18,7 +18,6 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    // Auto-start recording when component mounts
     startRecording();
 
     return () => {
@@ -91,39 +90,83 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
   };
 
   const sendVoiceMessage = async () => {
-    if (!audioBlob || !sendMessage) return;
+    if (!audioBlob) {
+      toast.error("No audio to send");
+      return;
+    }
+
+    if (!channel && !sendMessage) {
+      toast.error("Cannot send message - no channel or sendMessage available");
+      console.error("VoiceMessageRecorder: Neither channel nor sendMessage prop was provided");
+      return;
+    }
+
     setSending(true);
 
     try {
+      console.log("📤 Starting voice message upload...");
+      console.log("Audio blob size:", audioBlob.size, "bytes");
+      console.log("Audio blob type:", audioBlob.type);
+
       // Upload to backend
       const formData = new FormData();
       formData.append("file", audioBlob, "voice-message.webm");
 
+      console.log("⬆️ Uploading to /upload/audio...");
+      
       const uploadRes = await axiosInstance.post("/upload/audio", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const { fileUrl, mimeType } = uploadRes.data;
+      console.log("✅ Upload successful:", uploadRes.data);
 
-      // Send via Stream Chat
-      await sendMessage({
+      const fileUrl = uploadRes.data.fileUrl || uploadRes.data.url;
+      const mimeType = uploadRes.data.mimeType || audioBlob.type;
+
+      if (!fileUrl) {
+        throw new Error("No file URL received from server");
+      }
+
+      console.log("📎 File URL:", fileUrl);
+      console.log("📨 Sending to Stream Chat...");
+
+      const messageData = {
         text: `🎤 Voice message (${formatTime(time)})`,
         attachments: [
           {
             type: "audio",
             asset_url: fileUrl,
-            mime_type: mimeType || audioBlob.type,
+            mime_type: mimeType,
             file_size: audioBlob.size,
             title: "Voice Message",
           },
         ],
-      });
+      };
 
+      // Try sendMessage first (if provided), then fallback to channel.sendMessage
+      if (sendMessage) {
+        console.log("Using sendMessage prop");
+        await sendMessage(messageData);
+      } else if (channel) {
+        console.log("Using channel.sendMessage");
+        await channel.sendMessage(messageData);
+      }
+
+      console.log("✅ Message sent successfully!");
       toast.success("Voice message sent!");
       onClose();
     } catch (err) {
-      console.error("Voice upload error:", err);
-      toast.error(err.response?.data?.message || "Upload failed");
+      console.error("❌ Voice message error:", err);
+      console.error("Error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+
+      const errorMessage =
+        err.response?.data?.message || err.message || "Failed to send voice message";
+      
+      toast.error(errorMessage);
       setSending(false);
     }
   };
@@ -159,7 +202,6 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
         {/* Recording UI */}
         {!audioURL ? (
           <div className="space-y-6">
-            {/* Timer */}
             <div className="text-center">
               <div className="text-5xl font-bold font-mono tabular-nums text-primary tracking-wider">
                 {formatTime(time)}
@@ -175,7 +217,6 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
               )}
             </div>
 
-            {/* Controls */}
             <div className="flex items-center justify-center gap-4">
               <button
                 onClick={stopRecording}
@@ -190,12 +231,9 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
             </p>
           </div>
         ) : (
-          /* Preview UI */
           <div className="space-y-4">
-            {/* Audio player */}
             <audio ref={audioRef} src={audioURL} onEnded={handleAudioEnded} className="hidden" />
 
-            {/* Preview Controls */}
             <div className="flex items-center gap-4 p-4 bg-base-100/50 rounded-xl border border-base-300 backdrop-blur-sm">
               <button
                 onClick={togglePlayback}
@@ -214,7 +252,6 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
                   <span className="text-sm font-semibold text-base-content">Voice Message</span>
                   <span className="text-sm text-base-content/60 font-mono">{formatTime(time)}</span>
                 </div>
-                {/* Waveform visualization */}
                 <div className="flex items-center gap-0.5 h-8">
                   {[...Array(40)].map((_, i) => (
                     <div
@@ -241,7 +278,6 @@ const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
               </button>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 onClick={discardRecording}
