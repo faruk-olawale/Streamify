@@ -38,7 +38,6 @@ import {
   XCircle,
   Edit,
   X,
-  Mic,
   Pin,
   Search,
   Image as ImageIcon,
@@ -46,32 +45,32 @@ import {
   TrendingUp,
   Zap,
   Sparkles,
-  MoreVertical,
   Hash,
 } from "lucide-react";
 import EditGroupModal from "../component/EditGroupModal";
 import AddMembersModal from "../component/AddMembersModal";
 import MemberProfileModal from "../component/MemberProfileModal";
-import VoiceMessageRecorder from "../component/VoiceMessageRecorder";
 import PinnedMessagesPanel from "../component/PinnedMessagesPanel";
 import MessageSearchPanel from "../component/MessageSearchPanel";
 import ActivityTimelinePanel from "../component/ActivityTimelinePanel";
 import QuickActionsMenu from "../component/QuickActionsMenu";
+import CustomSendButton from "../component/CustomSendButton";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // State
   const [channel, setChannel] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("about");
-  const queryClient = useQueryClient();
 
   // Fetch group details
   const {
@@ -94,12 +93,9 @@ const GroupChatPage = ({ authUser }) => {
   });
 
   // Use global Stream client
-  const { client, isConnecting } = useStreamClient(
-    authUser,
-    tokenData?.token
-  );
+  const { client, isConnecting } = useStreamClient(authUser, tokenData?.token);
 
-  // Setup channel when client and group are ready
+  // Setup channel
   useEffect(() => {
     if (!client || !group || !userRole?.isMember) {
       setChannel(null);
@@ -111,10 +107,7 @@ const GroupChatPage = ({ authUser }) => {
 
     const setupChannel = async () => {
       try {
-        activeChannel = client.channel(
-          "messaging",
-          group.streamChannelId
-        );
+        activeChannel = client.channel("messaging", group.streamChannelId);
         await activeChannel.watch();
 
         if (isMounted) {
@@ -209,6 +202,7 @@ const GroupChatPage = ({ authUser }) => {
     },
   });
 
+  // Loading state
   if (loadingGroup || isConnecting) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-base-100 via-base-200 to-base-100">
@@ -217,12 +211,15 @@ const GroupChatPage = ({ authUser }) => {
             <span className="loading loading-spinner loading-lg text-primary"></span>
             <div className="absolute inset-0 loading loading-spinner loading-lg text-secondary opacity-30 scale-125"></div>
           </div>
-          <p className="mt-4 text-sm text-base-content/60 font-medium">Loading group...</p>
+          <p className="mt-4 text-sm text-base-content/60 font-medium">
+            Loading group...
+          </p>
         </div>
       </div>
     );
   }
 
+  // Group not found
   if (!group) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-base-100 via-base-200 to-base-100">
@@ -233,9 +230,11 @@ const GroupChatPage = ({ authUser }) => {
           <h2 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-r from-base-content to-base-content/60 bg-clip-text text-transparent">
             Group not found
           </h2>
-          <p className="text-base-content/60 mb-6">This group doesn't exist or has been deleted.</p>
-          <button 
-            onClick={() => navigate("/groups")} 
+          <p className="text-base-content/60 mb-6">
+            This group doesn't exist or has been deleted.
+          </p>
+          <button
+            onClick={() => navigate("/groups")}
             className="btn btn-primary gap-2 shadow-lg hover:shadow-xl transition-all"
           >
             <ArrowLeft size={18} />
@@ -255,7 +254,7 @@ const GroupChatPage = ({ authUser }) => {
       case "about":
         return (
           <div className="space-y-6 animate-fadeIn">
-            {/* Enhanced Group Info Card */}
+            {/* Group Info Card */}
             <div className="card bg-gradient-to-br from-base-100 to-base-200/50 shadow-md border border-base-300/50">
               <div className="card-body p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -263,7 +262,7 @@ const GroupChatPage = ({ authUser }) => {
                     <Hash size={20} className="text-primary" />
                     About Group
                   </h4>
-                  {userRole.isAdmin && (
+                  {userRole?.isAdmin && (
                     <button
                       onClick={() => {
                         setShowEditModal(true);
@@ -276,16 +275,17 @@ const GroupChatPage = ({ authUser }) => {
                     </button>
                   )}
                 </div>
-                
-                {/* Group Image & Info */}
+
                 <div className="flex items-start gap-4 mb-4">
                   <div className="avatar">
                     <div className="w-20 h-20 rounded-2xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-100">
-                      <img 
-                        src={group.image || "https://via.placeholder.com/150?text=Group"} 
+                      <img
+                        src={group.image || "https://via.placeholder.com/150?text=Group"}
                         alt={group.name}
                         onError={(e) => {
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random&bold=true`;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            group.name
+                          )}&background=random&bold=true`;
                         }}
                       />
                     </div>
@@ -295,18 +295,22 @@ const GroupChatPage = ({ authUser }) => {
                     <div className="flex items-center gap-3 text-sm text-base-content/60 mb-2">
                       <div className="flex items-center gap-1">
                         <Users size={14} />
-                        <span className="font-medium">{group.members?.length || 0} members</span>
+                        <span className="font-medium">
+                          {group.members?.length || 0} members
+                        </span>
                       </div>
                       {group.createdAt && (
-                        <div className="flex items-center gap-1">
+                        <>
                           <span>•</span>
-                          <span>Created {new Date(group.createdAt).toLocaleDateString()}</span>
-                        </div>
+                          <span>
+                            Created {new Date(group.createdAt).toLocaleDateString()}
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
-                
+
                 {group.description && (
                   <div className="p-3 bg-base-200/50 rounded-lg border border-base-300/30">
                     <p className="text-sm text-base-content/80 leading-relaxed">
@@ -314,18 +318,21 @@ const GroupChatPage = ({ authUser }) => {
                     </p>
                   </div>
                 )}
-                
+
                 <div className="flex items-center gap-2 mt-3 p-3 bg-warning/5 rounded-lg border border-warning/10">
                   <Crown size={16} className="text-warning flex-shrink-0" />
                   <span className="text-sm text-base-content/70">
-                    Created by <span className="font-semibold text-base-content">{group.createdBy?.fullName}</span>
+                    Created by{" "}
+                    <span className="font-semibold text-base-content">
+                      {group.createdBy?.fullName}
+                    </span>
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Add Members Button (Admin Only) */}
-            {userRole.isAdmin && (
+            {/* Add Members Button */}
+            {userRole?.isAdmin && (
               <button
                 onClick={() => {
                   setShowAddMembersModal(true);
@@ -339,8 +346,8 @@ const GroupChatPage = ({ authUser }) => {
               </button>
             )}
 
-            {/* Pending Requests (Admin Only) */}
-            {userRole.isAdmin && group.pendingRequests?.length > 0 && (
+            {/* Pending Requests */}
+            {userRole?.isAdmin && group.pendingRequests?.length > 0 && (
               <div className="card bg-info/5 border border-info/20 shadow-sm">
                 <div className="card-body p-5">
                   <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
@@ -362,20 +369,28 @@ const GroupChatPage = ({ authUser }) => {
                                 src={request.userId.profilePic}
                                 alt={request.userId.fullName}
                                 onError={(e) => {
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(request.userId.fullName)}&background=random`;
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    request.userId.fullName
+                                  )}&background=random`;
                                 }}
                               />
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate">{request.userId.fullName}</p>
+                            <p className="text-sm font-semibold truncate">
+                              {request.userId.fullName}
+                            </p>
                             <p className="text-xs text-base-content/50">Wants to join</p>
                           </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0">
                           <button
                             onClick={() => {
-                              if (confirm(`Approve ${request.userId.fullName}'s request?`)) {
+                              if (
+                                confirm(
+                                  `Approve ${request.userId.fullName}'s request?`
+                                )
+                              ) {
                                 approveRequestMutation.mutate(request.userId._id);
                               }
                             }}
@@ -387,7 +402,9 @@ const GroupChatPage = ({ authUser }) => {
                           </button>
                           <button
                             onClick={() => {
-                              if (confirm(`Reject ${request.userId.fullName}'s request?`)) {
+                              if (
+                                confirm(`Reject ${request.userId.fullName}'s request?`)
+                              ) {
                                 rejectRequestMutation.mutate(request.userId._id);
                               }
                             }}
@@ -411,7 +428,9 @@ const GroupChatPage = ({ authUser }) => {
                 <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
                   <Users size={20} className="text-primary" />
                   Members
-                  <div className="badge badge-primary badge-sm">{group.members?.length || 0}</div>
+                  <div className="badge badge-primary badge-sm">
+                    {group.members?.length || 0}
+                  </div>
                 </h4>
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                   {group.members?.map((member) => {
@@ -433,7 +452,9 @@ const GroupChatPage = ({ authUser }) => {
                                 src={member.profilePic}
                                 alt={member.fullName}
                                 onError={(e) => {
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.fullName)}&background=random`;
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    member.fullName
+                                  )}&background=random`;
                                 }}
                               />
                             </div>
@@ -462,13 +483,17 @@ const GroupChatPage = ({ authUser }) => {
                             </div>
                           </div>
                         </div>
-                        {userRole.isAdmin &&
+                        {userRole?.isAdmin &&
                           member._id !== authUser._id &&
                           !isCreator && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Remove ${member.fullName} from the group?`)) {
+                                if (
+                                  confirm(
+                                    `Remove ${member.fullName} from the group?`
+                                  )
+                                ) {
                                   removeMemberMutation.mutate(member._id);
                                 }
                               }}
@@ -495,24 +520,27 @@ const GroupChatPage = ({ authUser }) => {
               <ImageIcon size={20} className="text-primary" />
               <h4 className="font-bold text-lg">Media Gallery</h4>
             </div>
-            <p className="text-sm text-base-content/60 mb-4">All images and videos shared in this group</p>
-            
-            {/* Enhanced Media Grid */}
+            <p className="text-sm text-base-content/60 mb-4">
+              All images and videos shared in this group
+            </p>
             <div className="grid grid-cols-3 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className="aspect-square bg-gradient-to-br from-base-300 to-base-200 rounded-xl animate-pulse shadow-inner border border-base-300/50"
                 ></div>
               ))}
             </div>
-            
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <ImageIcon size={32} className="text-primary/50" />
               </div>
-              <p className="text-sm text-base-content/50 font-medium">No media shared yet</p>
-              <p className="text-xs text-base-content/40 mt-1">Share photos and videos in the chat</p>
+              <p className="text-sm text-base-content/50 font-medium">
+                No media shared yet
+              </p>
+              <p className="text-xs text-base-content/40 mt-1">
+                Share photos and videos in the chat
+              </p>
             </div>
           </div>
         );
@@ -524,28 +552,37 @@ const GroupChatPage = ({ authUser }) => {
               <FileText size={20} className="text-primary" />
               <h4 className="font-bold text-lg">Shared Files</h4>
             </div>
-            <p className="text-sm text-base-content/60 mb-4">All documents shared in this group</p>
-            
-            {/* Enhanced Files List */}
+            <p className="text-sm text-base-content/60 mb-4">
+              All documents shared in this group
+            </p>
             <div className="space-y-2">
               {[
-                { name: "Spanish_Grammar_Guide.pdf", size: "2.4 MB", date: "2 days ago", color: "error" },
-                { name: "Vocabulary_List.docx", size: "150 KB", date: "1 week ago", color: "info" },
+                {
+                  name: "Spanish_Grammar_Guide.pdf",
+                  size: "2.4 MB",
+                  date: "2 days ago",
+                },
+                {
+                  name: "Vocabulary_List.docx",
+                  size: "150 KB",
+                  date: "1 week ago",
+                },
               ].map((file, i) => (
-                <div 
-                  key={i} 
-                  className="flex items-center gap-4 p-4 bg-base-200/50 rounded-xl border border-base-300/50 hover:bg-base-200 hover:shadow-md transition-all cursor-pointer group"
+                <div
+                  key={i}
+                  className="flex items-center gap-4 p-4 bg-base-200/50 rounded-xl border border-base-300/50 hover:bg-base-200 hover:shadow-md transition-all cursor-pointer"
                 >
-                  <div className={`p-3 bg-${file.color}/10 rounded-lg border border-${file.color}/20 group-hover:scale-110 transition-transform`}>
-                    <FileText size={24} className={`text-${file.color}`} />
+                  <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <FileText size={24} className="text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate mb-0.5">{file.name}</p>
-                    <p className="text-xs text-base-content/50">{file.size} • {file.date}</p>
+                    <p className="text-sm font-semibold truncate mb-0.5">
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-base-content/50">
+                      {file.size} • {file.date}
+                    </p>
                   </div>
-                  <button className="btn btn-ghost btn-sm btn-circle opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreVertical size={16} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -562,7 +599,7 @@ const GroupChatPage = ({ authUser }) => {
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-base-100 via-base-200/30 to-base-100 overflow-hidden">
-      {/* Enhanced Header */}
+      {/* HEADER - THIS WAS MISSING */}
       <div className="bg-gradient-to-r from-base-200/80 to-base-300/50 backdrop-blur-xl p-4 flex items-center justify-between border-b-2 border-primary/10 shadow-lg flex-shrink-0">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
@@ -573,11 +610,13 @@ const GroupChatPage = ({ authUser }) => {
           </button>
           <div className="avatar">
             <div className="w-12 h-12 rounded-2xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-200">
-              <img 
-                src={group.image || "https://via.placeholder.com/150?text=Group"} 
+              <img
+                src={group.image || "https://via.placeholder.com/150?text=Group"}
                 alt={group.name}
                 onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random&bold=true`;
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    group.name
+                  )}&background=random&bold=true`;
                 }}
               />
             </div>
@@ -585,9 +624,7 @@ const GroupChatPage = ({ authUser }) => {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-lg truncate flex items-center gap-2">
               {group.name}
-              {userRole?.isAdmin && (
-                <Shield size={16} className="text-warning" />
-              )}
+              {userRole?.isAdmin && <Shield size={16} className="text-warning" />}
             </h2>
             <div className="flex items-center gap-2 text-xs text-base-content/60">
               <div className="flex items-center gap-1">
@@ -602,7 +639,9 @@ const GroupChatPage = ({ authUser }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className={`btn btn-sm btn-circle ${showSearch ? 'btn-primary' : 'btn-ghost'} hover:scale-110 transition-all shadow-sm`}
+              className={`btn btn-sm btn-circle ${
+                showSearch ? "btn-primary" : "btn-ghost"
+              } hover:scale-110 transition-all shadow-sm`}
               title="Search messages"
             >
               <Search size={18} />
@@ -610,7 +649,9 @@ const GroupChatPage = ({ authUser }) => {
 
             <button
               onClick={() => setShowPinnedMessages(!showPinnedMessages)}
-              className={`btn btn-sm btn-circle ${showPinnedMessages ? 'btn-warning' : 'btn-ghost'} hover:scale-110 transition-all shadow-sm`}
+              className={`btn btn-sm btn-circle ${
+                showPinnedMessages ? "btn-warning" : "btn-ghost"
+              } hover:scale-110 transition-all shadow-sm`}
               title="Pinned messages"
             >
               <Pin size={18} />
@@ -618,7 +659,9 @@ const GroupChatPage = ({ authUser }) => {
 
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`btn btn-sm gap-2 ${showSettings ? 'btn-primary' : 'btn-ghost'} hover:scale-105 transition-all shadow-sm`}
+              className={`btn btn-sm gap-2 ${
+                showSettings ? "btn-primary" : "btn-ghost"
+              } hover:scale-105 transition-all shadow-sm`}
             >
               <Settings size={18} />
               <span className="hidden md:inline text-xs font-medium">Settings</span>
@@ -628,7 +671,6 @@ const GroupChatPage = ({ authUser }) => {
       </div>
 
       <div className="flex-1 flex overflow-hidden relative min-h-0">
-        {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-h-0">
           {!userRole?.isMember ? (
             <div className="flex-1 flex items-center justify-center p-6">
@@ -640,13 +682,16 @@ const GroupChatPage = ({ authUser }) => {
                   Join this group
                 </h3>
                 <p className="text-base-content/60 mb-8 leading-relaxed">
-                  {group.description || "Connect with other language learners and start practicing together!"}
+                  {group.description ||
+                    "Connect with other language learners and start practicing together!"}
                 </p>
                 {isPending ? (
                   <div className="alert alert-info shadow-lg">
-                    <div>
+                    <div className="flex items-center gap-3">
                       <span className="loading loading-spinner loading-sm"></span>
-                      <span className="font-medium">Your join request is pending approval</span>
+                      <span className="font-medium">
+                        Your join request is pending approval
+                      </span>
                     </div>
                   </div>
                 ) : (
@@ -691,58 +736,33 @@ const GroupChatPage = ({ authUser }) => {
 
               <div className="flex-1 min-h-0 overflow-hidden relative">
                 <Chat client={client}>
-                  <Channel channel={channel}>
+                  {/* KEY: Use SendButton prop on Channel */}
+                  <Channel
+                    channel={channel}
+                    SendButton={(props) => (
+                      <CustomSendButton {...props} channel={channel} />
+                    )}
+                  >
                     <Window>
                       <ChannelHeader />
                       <MessageList />
                       <TypingIndicator />
-                      
-                      <div style={{ position: 'relative' }}>
-                    <MessageInput />
-                    
-                    <button
-                      onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                      className={`btn btn-circle ${showVoiceRecorder ? 'btn-error' : 'btn-ghost hover:btn-primary'}`}
-                      title="Send voice message"
-                      type="button"
-                      style={{
-                        position: 'absolute',
-                        right: '60px',      // ← Positions it left of Send button
-                        bottom: '8px',
-                        zIndex: 10,
-                        width: '40px',      // ← Same size as Send button
-                        height: '40px'
-                      }}
-                    >
-                      <Mic size={20} />
-                    </button>
-
-                    {showVoiceRecorder && (
-                      <VoiceMessageRecorder
-                        channel={channel}
-                        onClose={() => setShowVoiceRecorder(false)}
-                      />
-                    )}
-                      </div>
-
-                      {showVoiceRecorder && (
-                        <VoiceMessageRecorder
-                          channel={channel}
-                          onClose={() => setShowVoiceRecorder(false)}
-                        />
-                      )}
+                      <MessageInput grow />
                     </Window>
                     <Thread />
                   </Channel>
                 </Chat>
 
-                {/* Enhanced Floating Quick Actions Button */}
+                {/* Quick Actions Button */}
                 <div className="absolute bottom-24 right-6 z-10">
                   <button
                     onClick={() => setShowQuickActions(!showQuickActions)}
                     className="btn btn-circle btn-lg bg-gradient-to-br from-primary via-secondary to-primary shadow-2xl hover:shadow-3xl hover:scale-110 transition-all border-2 border-white/20 group"
                   >
-                    <Zap size={28} className="group-hover:rotate-12 transition-transform" />
+                    <Zap
+                      size={28}
+                      className="group-hover:rotate-12 transition-transform"
+                    />
                   </button>
                 </div>
               </div>
@@ -751,21 +771,24 @@ const GroupChatPage = ({ authUser }) => {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <span className="loading loading-spinner loading-lg text-primary"></span>
-                <p className="mt-4 text-sm text-base-content/60">Connecting to chat...</p>
+                <p className="mt-4 text-sm text-base-content/60">
+                  Connecting to chat...
+                </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Enhanced Settings Sidebar */}
+        {/* Settings Sidebar */}
         {showSettings && userRole?.isMember && (
           <>
-            <div 
+            <div
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
               onClick={() => setShowSettings(false)}
             ></div>
-            
-            <div className={`
+
+            <div
+              className={`
               fixed lg:relative
               top-0 right-0 bottom-0
               w-full sm:w-[420px] lg:w-96
@@ -775,8 +798,9 @@ const GroupChatPage = ({ authUser }) => {
               z-50
               shadow-2xl
               transform transition-all duration-300 ease-out
-              ${showSettings ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
-            `}>
+              ${showSettings ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
+            `}
+            >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6 lg:hidden">
                   <h3 className="font-bold text-2xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -794,7 +818,7 @@ const GroupChatPage = ({ authUser }) => {
                   Group Settings
                 </h3>
 
-                {/* Enhanced Tabs */}
+                {/* Tabs */}
                 <div className="tabs tabs-boxed mb-6 p-1 bg-base-300/50 backdrop-blur-sm">
                   {[
                     { id: "about", icon: Users, label: "About" },
@@ -817,9 +841,9 @@ const GroupChatPage = ({ authUser }) => {
 
                 {renderSettingsContent()}
 
-                {/* Enhanced Action Buttons */}
+                {/* Action Buttons */}
                 <div className="space-y-3 border-t-2 border-base-300/50 pt-6 mt-8">
-                  {!userRole.isCreator && (
+                  {!userRole?.isCreator && (
                     <button
                       onClick={() => {
                         if (confirm("Are you sure you want to leave this group?")) {
@@ -834,7 +858,7 @@ const GroupChatPage = ({ authUser }) => {
                     </button>
                   )}
 
-                  {userRole.isCreator && (
+                  {userRole?.isCreator && (
                     <button
                       onClick={() => {
                         if (
@@ -861,13 +885,10 @@ const GroupChatPage = ({ authUser }) => {
 
       {/* Modals */}
       {showEditModal && (
-        <EditGroupModal
-          group={group}
-          onClose={() => setShowEditModal(false)}
-        />
+        <EditGroupModal group={group} onClose={() => setShowEditModal(false)} />
       )}
 
-      {showAddMembersModal && userRole.isAdmin && (
+      {showAddMembersModal && userRole?.isAdmin && (
         <AddMembersModal
           group={group}
           onClose={() => setShowAddMembersModal(false)}
@@ -889,6 +910,7 @@ const GroupChatPage = ({ authUser }) => {
         />
       )}
 
+      {/* Styles */}
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -916,14 +938,6 @@ const GroupChatPage = ({ authUser }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: hsl(var(--p) / 0.5);
         }
-      `}</style>
-            <style jsx global>{`
-        .str-chat__input-flat {
-          padding-right: 110px !important;
-        }
-        
-        /* Your existing styles... */
-        @keyframes fadeIn { ... }
       `}</style>
     </div>
   );

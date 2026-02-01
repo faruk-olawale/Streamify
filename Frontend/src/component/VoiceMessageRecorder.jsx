@@ -3,15 +3,7 @@ import { Mic, Square, Play, Pause, Send, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 
-/* =====================
-   Pick supported audio format
-===================== */
-const getMimeType = () => {
-  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp3"];
-  return types.find((t) => MediaRecorder.isTypeSupported(t));
-};
-
-const VoiceMessageRecorder = ({ channel, onClose }) => {
+const VoiceMessageRecorder = ({ sendMessage, onClose }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioURL, setAudioURL] = useState(null);
@@ -26,27 +18,27 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
   const timerRef = useRef(null);
 
   useEffect(() => {
+    // Auto-start recording when component mounts
+    startRecording();
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioURL) URL.revokeObjectURL(audioURL);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [audioURL]);
+  }, []);
 
-  /* =====================
-     Recording
-  ===================== */
+  const getMimeType = () => {
+    const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    return types.find((t) => MediaRecorder.isTypeSupported(t)) || "audio/webm";
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
       const mimeType = getMimeType();
-      if (!mimeType) {
-        toast.error("Audio format not supported");
-        return;
-      }
-
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
       chunksRef.current = [];
@@ -68,18 +60,18 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
     } catch (err) {
       console.error("Microphone error:", err);
       toast.error("Microphone permission denied");
+      onClose();
     }
   };
 
   const stopRecording = () => {
-    recorderRef.current?.stop();
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.stop();
+    }
     clearInterval(timerRef.current);
     setIsRecording(false);
   };
 
-  /* =====================
-     Playback
-  ===================== */
   const togglePlayback = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -98,15 +90,12 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
     }
   };
 
-  /* =====================
-     Upload to Backend & Send
-  ===================== */
   const sendVoiceMessage = async () => {
-    if (!audioBlob) return;
+    if (!audioBlob || !sendMessage) return;
     setSending(true);
 
     try {
-      // Upload to your backend
+      // Upload to backend
       const formData = new FormData();
       formData.append("file", audioBlob, "voice-message.webm");
 
@@ -116,8 +105,8 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
 
       const { fileUrl, mimeType } = uploadRes.data;
 
-      // Send to Stream Chat with the uploaded URL
-      await channel.sendMessage({
+      // Send via Stream Chat
+      await sendMessage({
         text: `🎤 Voice message (${formatTime(time)})`,
         attachments: [
           {
@@ -145,13 +134,11 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
     setAudioBlob(null);
     setTime(0);
     setIsPlaying(false);
+    onClose();
   };
 
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  /* =====================
-     UI
-  ===================== */
   return (
     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-base-300 to-base-200 border-t-2 border-primary/20 shadow-2xl backdrop-blur-sm z-50 animate-slide-up">
       <div className="max-w-3xl mx-auto p-4">
@@ -161,8 +148,8 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
             <span className="text-sm font-semibold text-base-content">Voice Message</span>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={discardRecording}
             className="btn btn-ghost btn-xs btn-circle hover:bg-error/10 hover:text-error transition-colors"
           >
             <X size={16} />
@@ -190,39 +177,23 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
 
             {/* Controls */}
             <div className="flex items-center justify-center gap-4">
-              {!isRecording ? (
-                <button
-                  onClick={startRecording}
-                  className="btn btn-circle btn-lg bg-gradient-to-br from-primary to-secondary border-none shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
-                >
-                  <Mic size={28} className="text-primary-content" />
-                </button>
-              ) : (
-                <button
-                  onClick={stopRecording}
-                  className="btn btn-circle btn-lg bg-gradient-to-br from-error to-error/80 border-none shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
-                >
-                  <Square size={24} className="text-error-content fill-current" />
-                </button>
-              )}
+              <button
+                onClick={stopRecording}
+                className="btn btn-circle btn-lg bg-gradient-to-br from-error to-error/80 border-none shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
+              >
+                <Square size={24} className="text-error-content fill-current" />
+              </button>
             </div>
 
             <p className="text-center text-xs text-base-content/50">
-              {!isRecording
-                ? "Tap the microphone to start recording"
-                : "Tap the square to stop recording"}
+              Tap the square to stop recording
             </p>
           </div>
         ) : (
           /* Preview UI */
           <div className="space-y-4">
             {/* Audio player */}
-            <audio
-              ref={audioRef}
-              src={audioURL}
-              onEnded={handleAudioEnded}
-              className="hidden"
-            />
+            <audio ref={audioRef} src={audioURL} onEnded={handleAudioEnded} className="hidden" />
 
             {/* Preview Controls */}
             <div className="flex items-center gap-4 p-4 bg-base-100/50 rounded-xl border border-base-300 backdrop-blur-sm">
@@ -237,7 +208,7 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
                   <Play size={20} className="text-primary-content ml-0.5" />
                 )}
               </button>
-              
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-base-content">Voice Message</span>
@@ -249,12 +220,11 @@ const VoiceMessageRecorder = ({ channel, onClose }) => {
                     <div
                       key={i}
                       className={`flex-1 rounded-full transition-all duration-300 ${
-                        isPlaying ? 'bg-primary' : 'bg-base-content/20'
+                        isPlaying ? "bg-primary" : "bg-base-content/20"
                       }`}
                       style={{
                         height: `${Math.random() * 100}%`,
-                        minHeight: '20%',
-                        animationDelay: isPlaying ? `${i * 0.05}s` : '0s',
+                        minHeight: "20%",
                       }}
                     />
                   ))}
