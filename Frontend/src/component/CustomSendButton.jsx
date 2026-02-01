@@ -11,15 +11,10 @@ const CustomSendButton = ({ channel }) => {
   const { sendMessage } = useChannelActionContext();
   const messageInputContext = useMessageInputContext();
 
-  // EXTREME DEBUGGING
-  console.log("==========================================");
-  console.log("🔄 RENDER - hasText:", hasText);
-  console.log("🔄 RENDER - Will show:", hasText ? "SEND ICON ➤" : "MIC ICON 🎤");
-  console.log("==========================================");
+
 
   // Monitor textarea for text changes
   useEffect(() => {
-    console.log("🎬 useEffect running - setting up text monitoring");
     
     const checkForText = () => {
       // Try multiple selectors
@@ -42,22 +37,13 @@ const CustomSendButton = ({ channel }) => {
         const trimmedText = text.trim();
         const hasContent = trimmedText.length > 0;
         
-        console.log("📊 CHECK - textarea value:", `"${text}"`);
-        console.log("📊 CHECK - trimmed length:", trimmedText.length);
-        console.log("📊 CHECK - hasContent:", hasContent);
-        console.log("📊 CHECK - current hasText state:", hasText);
-        
         if (hasContent !== hasText) {
-          console.log("🔥 STATE CHANGE! Setting hasText to:", hasContent);
           setHasText(hasContent);
         }
-      } else {
-        console.warn("⚠️ NO TEXTAREA FOUND!");
       }
     };
 
     // Initial check
-    console.log("🏁 Initial check...");
     checkForText();
 
     // Try to find and attach to textarea
@@ -68,10 +54,6 @@ const CustomSendButton = ({ channel }) => {
                       document.querySelector('textarea');
       
       if (textarea) {
-        console.log("✅ TEXTAREA FOUND!");
-        console.log("Textarea element:", textarea);
-        console.log("Textarea class:", textarea.className);
-        console.log("Textarea placeholder:", textarea.placeholder);
         
         // Remove old listeners first
         textarea.removeEventListener('input', checkForText);
@@ -85,8 +67,6 @@ const CustomSendButton = ({ channel }) => {
         textarea.addEventListener('keyup', checkForText);
         textarea.addEventListener('keydown', checkForText);
         
-        console.log("✅ Event listeners attached");
-        
         return () => {
           textarea.removeEventListener('input', checkForText);
           textarea.removeEventListener('change', checkForText);
@@ -94,7 +74,6 @@ const CustomSendButton = ({ channel }) => {
           textarea.removeEventListener('keydown', checkForText);
         };
       } else {
-        console.error("❌ TEXTAREA NOT FOUND!");
         return null;
       }
     };
@@ -116,7 +95,6 @@ const CustomSendButton = ({ channel }) => {
   const handleMicClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("🎤 MIC BUTTON CLICKED");
     setShowVoiceRecorder(true);
   };
 
@@ -124,21 +102,17 @@ const CustomSendButton = ({ channel }) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log("📤 SEND BUTTON CLICKED");
-    
     // Try Stream's handleSubmit first
     if (messageInputContext?.handleSubmit) {
-      console.log("✅ Using Stream's handleSubmit");
       try {
         messageInputContext.handleSubmit(e);
         return;
       } catch (err) {
-        console.error("❌ handleSubmit error:", err);
+        // Silent error handling
       }
     }
     
     // Fallback: Simulate Enter key
-    console.log("⌨️ Simulating Enter key press");
     const textarea = document.querySelector('.str-chat__textarea textarea') ||
                     document.querySelector('textarea');
     
