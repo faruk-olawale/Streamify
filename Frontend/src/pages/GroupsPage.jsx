@@ -98,7 +98,7 @@ const GroupsPage = () => {
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Tab */}
             <div className="tabs tabs-boxed bg-base-200/80 backdrop-blur-sm p-1 shadow-sm">
               <button
                 className={`tab gap-1.5 sm:gap-2 flex-1 transition-all ${
