@@ -647,7 +647,7 @@ const GroupChatPage = ({ authUser }) => {
               <Search size={18} />
             </button>
 
-            <button
+            {/* <button
               onClick={() => setShowPinnedMessages(!showPinnedMessages)}
               className={`btn btn-sm btn-circle ${
                 showPinnedMessages ? "btn-warning" : "btn-ghost"
@@ -655,7 +655,7 @@ const GroupChatPage = ({ authUser }) => {
               title="Pinned messages"
             >
               <Pin size={18} />
-            </button>
+            </button> */}
 
             <button
               onClick={() => setShowSettings(!showSettings)}
