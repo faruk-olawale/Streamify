@@ -95,9 +95,9 @@ const VoiceMessageRecorder = ({ channel, sendMessage, onClose }) => {
       return;
     }
 
-    if (!channel && !sendMessage) {
-      toast.error("Cannot send message - no channel or sendMessage available");
-      console.error("VoiceMessageRecorder: Neither channel nor sendMessage prop was provided");
+    if (!channel) {
+      toast.error("Cannot send message - no channel available");
+      console.error("VoiceMessageRecorder: channel prop not provided");
       return;
     }
 
@@ -106,7 +106,6 @@ const VoiceMessageRecorder = ({ channel, sendMessage, onClose }) => {
     try {
       console.log("📤 Starting voice message upload...");
       console.log("Audio blob size:", audioBlob.size, "bytes");
-      console.log("Audio blob type:", audioBlob.type);
 
       // Upload to backend
       const formData = new FormData();
@@ -128,9 +127,11 @@ const VoiceMessageRecorder = ({ channel, sendMessage, onClose }) => {
       }
 
       console.log("📎 File URL:", fileUrl);
-      console.log("📨 Sending to Stream Chat...");
+      console.log("📨 Sending to Stream Chat via channel.sendMessage()...");
 
-      const messageData = {
+      // IMPORTANT: Use channel.sendMessage() directly
+      // Stream Chat will automatically add the user info
+      await channel.sendMessage({
         text: `🎤 Voice message (${formatTime(time)})`,
         attachments: [
           {
@@ -141,16 +142,7 @@ const VoiceMessageRecorder = ({ channel, sendMessage, onClose }) => {
             title: "Voice Message",
           },
         ],
-      };
-
-      // Try sendMessage first (if provided), then fallback to channel.sendMessage
-      if (sendMessage) {
-        console.log("Using sendMessage prop");
-        await sendMessage(messageData);
-      } else if (channel) {
-        console.log("Using channel.sendMessage");
-        await channel.sendMessage(messageData);
-      }
+      });
 
       console.log("✅ Message sent successfully!");
       toast.success("Voice message sent!");
