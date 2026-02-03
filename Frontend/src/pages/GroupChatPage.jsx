@@ -73,6 +73,7 @@ const GroupChatPage = ({ authUser }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("about");
+  const [hasPinnedMessages, setHasPinnedMessages] = useState(false);
 
   // Fetch group details
   const {
@@ -133,6 +134,38 @@ const GroupChatPage = ({ authUser }) => {
       setChannel(null);
     };
   }, [client, group, userRole]);
+
+  // Check for pinned messages
+useEffect(() => {
+  if (!channel) return;
+
+  const checkPinnedMessages = async () => {
+    try {
+      const response = await channel.query({
+        messages: { limit: 100 },
+      });
+      const pinned = response.messages.filter((msg) => msg.pinned === true);
+      setHasPinnedMessages(pinned.length > 0);
+    } catch (error) {
+      console.error("Error checking pinned messages:", error);
+    }
+  };
+
+  checkPinnedMessages();
+
+  // Listen for pin/unpin events
+  const handleUpdate = (event) => {
+    if (event.type === "message.updated") {
+      checkPinnedMessages();
+    }
+  };
+
+  channel.on("message.updated", handleUpdate);
+
+  return () => {
+    channel.off("message.updated", handleUpdate);
+  };
+}, [channel]);
 
   // Mutations
   const requestJoinMutation = useMutation({
@@ -617,15 +650,17 @@ case "files":
               <Search size={18} />
             </button>
 
-            <button
-              onClick={() => setShowPinnedMessages(!showPinnedMessages)}
-              className={`btn btn-sm btn-circle ${
-                showPinnedMessages ? "btn-warning" : "btn-ghost"
-              } hover:scale-110 transition-all shadow-sm`}
-              title="Pinned messages"
-            >
-              <Pin size={18} />
-            </button>
+     {hasPinnedMessages && (
+      <button
+        onClick={() => setShowPinnedMessages(!showPinnedMessages)}
+        className={`btn btn-xs sm:btn-sm btn-circle ${
+          showPinnedMessages ? "btn-warning" : "btn-ghost"
+        } hover:scale-110 transition-all shadow-sm`}
+        title="Pinned messages"
+      >
+        <Pin size={16} className="sm:w-[18px] sm:h-[18px]" />
+      </button>
+      )}
 
             <button
               onClick={() => setShowSettings(!showSettings)}

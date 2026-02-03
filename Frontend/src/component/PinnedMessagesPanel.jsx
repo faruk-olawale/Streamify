@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pin, X, Trash2, User, Calendar, MessageSquare } from "lucide-react";
+import { Pin, X, Trash2, Calendar, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 
 const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
@@ -12,15 +12,12 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
     const fetchPinnedMessages = async () => {
       setLoading(true);
       try {
-        // Query for pinned messages
         const response = await channel.query({
           messages: { limit: 100 },
         });
 
-        // Filter pinned messages
         const pinned = response.messages.filter((msg) => msg.pinned === true);
         
-        // Sort by pinned_at timestamp (newest first)
         pinned.sort((a, b) => {
           const timeA = a.pinned_at ? new Date(a.pinned_at) : new Date(a.created_at);
           const timeB = b.pinned_at ? new Date(b.pinned_at) : new Date(b.created_at);
@@ -38,11 +35,9 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
 
     fetchPinnedMessages();
 
-    // Listen for new pins/unpins
     const handleEvent = (event) => {
       if (event.type === "message.updated") {
         if (event.message.pinned) {
-          // Message was pinned
           setPinnedMessages((prev) => {
             const exists = prev.find((msg) => msg.id === event.message.id);
             if (exists) {
@@ -53,7 +48,6 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
             return [event.message, ...prev];
           });
         } else {
-          // Message was unpinned
           setPinnedMessages((prev) =>
             prev.filter((msg) => msg.id !== event.message.id)
           );
@@ -68,19 +62,25 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
     };
   }, [channel]);
 
-  const unpinMessage = async (messageId) => {
+  const unpinMessage = async (message) => {
     try {
-      await channel.unpinMessage({ id: messageId });
+      const client = channel.getClient();
+      
+      // Use client.partialUpdateMessage
+      await client.partialUpdateMessage(message.id, {
+        set: { pinned: false },
+      });
+      
       toast.success("Message unpinned");
+      setPinnedMessages((prev) => prev.filter((msg) => msg.id !== message.id));
     } catch (error) {
       console.error("Error unpinning message:", error);
-      toast.error("Failed to unpin message");
+      toast.error("Failed to unpin. Please unpin from the message menu.");
     }
   };
 
-  const jumpToMessage = async (messageId) => {
+  const jumpToMessage = (messageId) => {
     try {
-      // This will scroll to the message in the chat
       const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
       if (messageElement) {
         messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -109,7 +109,6 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
 
   return (
     <div className="absolute top-0 left-0 right-0 bottom-0 bg-base-100 z-30 flex flex-col">
-      {/* Header */}
       <div className="flex-shrink-0 bg-gradient-to-r from-warning/20 to-warning/10 border-b-2 border-warning/30 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -132,7 +131,6 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -153,8 +151,8 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
             <div className="text-xs text-base-content/50 max-w-sm mx-auto">
               <p className="mb-2">💡 <strong>How to pin:</strong></p>
               <ol className="text-left space-y-1">
-                <li>• Long press a message (mobile)</li>
-                <li>• Right click a message (desktop)</li>
+                <li>• Hover over a message</li>
+                <li>• Click the three dots (...)</li>
                 <li>• Select "Pin Message"</li>
               </ol>
             </div>
@@ -167,7 +165,6 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
                 className="card bg-base-200 shadow-md hover:shadow-lg transition-all border border-warning/20 hover:border-warning/40"
               >
                 <div className="card-body p-4">
-                  {/* Message Header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="avatar">
@@ -199,27 +196,21 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
                       </div>
                     </div>
 
-                    {/* Pin indicator */}
                     <div className="badge badge-warning badge-sm gap-1">
                       <Pin size={12} />
                       Pinned
                     </div>
                   </div>
 
-                  {/* Message Content */}
                   <div className="bg-base-100 rounded-lg p-3 mb-3">
                     <p className="text-sm break-words whitespace-pre-wrap">
-                      {message.text || message.html || "No text content"}
+                      {message.text || "No text content"}
                     </p>
 
-                    {/* Attachments */}
                     {message.attachments && message.attachments.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {message.attachments.map((attachment, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-2 p-2 bg-base-200 rounded-lg"
-                          >
+                          <div key={index} className="flex items-center gap-2 p-2 bg-base-200 rounded-lg">
                             {attachment.type === "image" && (
                               <img
                                 src={attachment.image_url || attachment.thumb_url}
@@ -241,7 +232,6 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2">
                     <button
                       onClick={() => jumpToMessage(message.id)}
@@ -252,7 +242,7 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
                     </button>
                     {userRole?.isAdmin && (
                       <button
-                        onClick={() => unpinMessage(message.id)}
+                        onClick={() => unpinMessage(message)}
                         className="btn btn-sm btn-ghost gap-2 text-error hover:bg-error/10"
                       >
                         <Trash2 size={16} />
@@ -261,14 +251,10 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
                     )}
                   </div>
 
-                  {/* Pinned by info */}
                   {message.pinned_by && (
                     <div className="mt-2 pt-2 border-t border-base-300">
                       <p className="text-xs text-base-content/50">
-                        Pinned by{" "}
-                        <span className="font-semibold">
-                          {message.pinned_by.name || "Admin"}
-                        </span>
+                        Pinned by <span className="font-semibold">{message.pinned_by.name || "Admin"}</span>
                       </p>
                     </div>
                   )}
@@ -279,20 +265,14 @@ const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
         )}
       </div>
 
-      {/* Custom styles for message highlighting */}
       <style jsx global>{`
         .highlight-message {
           animation: highlightPulse 2s ease-in-out;
           background-color: hsl(var(--wa) / 0.2) !important;
         }
-
         @keyframes highlightPulse {
-          0%, 100% {
-            background-color: transparent;
-          }
-          50% {
-            background-color: hsl(var(--wa) / 0.3);
-          }
+          0%, 100% { background-color: transparent; }
+          50% { background-color: hsl(var(--wa) / 0.3); }
         }
       `}</style>
     </div>
