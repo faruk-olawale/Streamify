@@ -1,90 +1,83 @@
 import { useState, useEffect } from "react";
-import { Search, X, Calendar, User, ArrowRight } from "lucide-react";
+import { Search, X, Calendar, User, MessageSquare, Loader } from "lucide-react";
 
 const MessageSearchPanel = ({ channel, onClose }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    sender: "",
-    dateFrom: "",
-    dateTo: "",
-  });
+  const [hasSearched, setHasSearched] = useState(false);
 
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const delayDebounceFn = setTimeout(() => {
-        performSearch();
-      }, 300);
-
-      return () => clearTimeout(delayDebounceFn);
-    } else {
+  const searchMessages = async (query) => {
+    if (!query.trim() || !channel) {
       setSearchResults([]);
+      setHasSearched(false);
+      return;
     }
-  }, [searchQuery, filters]);
 
-  const performSearch = async () => {
+    setLoading(true);
+    setHasSearched(true);
+
     try {
-      setLoading(true);
-      
-      // Mock search results
-      const mockResults = [
-        {
-          id: "1",
-          text: `How do you say "hello" in Spanish?`,
-          user: { name: "John Doe", image: "https://via.placeholder.com/40" },
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: "2",
-          text: "You say 'Hola' - it's one of the first words you learn!",
-          user: { name: "Maria Garcia", image: "https://via.placeholder.com/40" },
-          created_at: new Date(Date.now() - 3500000).toISOString(),
-        },
-        {
-          id: "3",
-          text: "Can someone help me with pronunciation? I'm struggling with the 'r' sound.",
-          user: { name: "Mike Smith", image: "https://via.placeholder.com/40" },
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ].filter((msg) =>
-        msg.text.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      // Search in channel messages
+      const response = await channel.search({
+        text: { $autocomplete: query },
+      }, {
+        limit: 50,
+      });
 
-      setSearchResults(mockResults);
+      setSearchResults(response.results || []);
     } catch (error) {
       console.error("Search error:", error);
+      setSearchResults([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchMessages(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, channel]);
+
   const jumpToMessage = (messageId) => {
-    // Implement jump to message functionality
-    console.log("Jumping to message:", messageId);
+    try {
+      const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        messageElement.classList.add("highlight-message");
+        setTimeout(() => {
+          messageElement.classList.remove("highlight-message");
+        }, 2000);
+      }
+      onClose();
+    } catch (error) {
+      console.error("Error jumping to message:", error);
+    }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffInSeconds = Math.floor((now - date) / 1000);
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
     return date.toLocaleDateString();
   };
 
   const highlightText = (text, query) => {
-    if (!query.trim()) return text;
+    if (!query.trim() || !text) return text;
     
     const parts = text.split(new RegExp(`(${query})`, "gi"));
     return parts.map((part, index) =>
       part.toLowerCase() === query.toLowerCase() ? (
-        <mark key={index} className="bg-warning/30 text-warning-content px-0.5 rounded">
+        <mark key={index} className="bg-primary/30 text-primary-content font-semibold">
           {part}
         </mark>
       ) : (
@@ -94,134 +87,184 @@ const MessageSearchPanel = ({ channel, onClose }) => {
   };
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Search size={18} className="text-primary" />
-          <h4 className="font-semibold">Search Messages</h4>
+    <div className="absolute top-0 left-0 right-0 bottom-0 bg-base-100 z-30 flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-primary/20 to-primary/10 border-b-2 border-primary/30 p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Search size={20} className="text-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Search Messages</h3>
+              <p className="text-xs text-base-content/60">
+                {searchResults.length > 0
+                  ? `${searchResults.length} result${searchResults.length === 1 ? "" : "s"}`
+                  : "Type to search"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="btn btn-ghost btn-sm btn-circle hover:bg-error/10 hover:text-error"
+          >
+            <X size={20} />
+          </button>
         </div>
-        <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle">
-          <X size={16} />
-        </button>
-      </div>
 
-      {/* Search Input */}
-      <div className="mb-3">
-        <input
-          type="text"
-          placeholder="Search messages..."
-          className="input input-bordered w-full"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          autoFocus
-        />
-      </div>
-
-      {/* Filters */}
-      <div className="collapse collapse-arrow bg-base-100 mb-3">
-        <input type="checkbox" />
-        <div className="collapse-title text-sm font-medium">Advanced Filters</div>
-        <div className="collapse-content space-y-2">
-          <div>
-            <label className="label">
-              <span className="label-text text-xs">Sender</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Filter by sender name"
-              className="input input-bordered input-sm w-full"
-              value={filters.sender}
-              onChange={(e) =>
-                setFilters({ ...filters, sender: e.target.value })
-              }
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="label">
-                <span className="label-text text-xs">From Date</span>
-              </label>
-              <input
-                type="date"
-                className="input input-bordered input-sm w-full"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateFrom: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="label">
-                <span className="label-text text-xs">To Date</span>
-              </label>
-              <input
-                type="date"
-                className="input input-bordered input-sm w-full"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateTo: e.target.value })
-                }
-              />
-            </div>
-          </div>
+        {/* Search Input */}
+        <div className="relative">
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40"
+          />
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input input-bordered w-full pl-10 pr-10 bg-base-100"
+            autoFocus
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Search Results */}
-      <div className="max-h-96 overflow-y-auto">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <span className="loading loading-spinner loading-md"></span>
-          </div>
-        ) : searchQuery.trim() && searchResults.length === 0 ? (
-          <div className="text-center py-8">
-            <Search size={32} className="mx-auto text-base-content/30 mb-2" />
-            <p className="text-sm text-base-content/60">No messages found</p>
-          </div>
-        ) : searchResults.length > 0 ? (
-          <div className="space-y-2">
-            <div className="text-xs text-base-content/60 mb-2">
-              Found {searchResults.length} {searchResults.length === 1 ? "result" : "results"}
+          <div className="flex justify-center py-12">
+            <div className="text-center">
+              <Loader size={40} className="animate-spin text-primary mx-auto" />
+              <p className="mt-4 text-sm text-base-content/60">Searching...</p>
             </div>
-            {searchResults.map((result) => (
-              <div
-                key={result.id}
-                onClick={() => jumpToMessage(result.id)}
-                className="p-3 bg-base-100 rounded-lg hover:bg-base-200 transition-colors cursor-pointer group"
-              >
-                <div className="flex items-start gap-2">
-                  <img
-                    src={result.user.image}
-                    alt={result.user.name}
-                    className="w-8 h-8 rounded-full flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-sm">
-                        {result.user.name}
-                      </span>
-                      <span className="text-xs text-base-content/50">
-                        {formatDate(result.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-sm">
-                      {highlightText(result.text, searchQuery)}
-                    </p>
-                  </div>
-                  <ArrowRight
-                    size={16}
-                    className="text-base-content/30 group-hover:text-primary transition-colors flex-shrink-0"
-                  />
-                </div>
-              </div>
-            ))}
+          </div>
+        ) : !hasSearched ? (
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Search size={40} className="text-primary/50" />
+            </div>
+            <h4 className="font-bold text-lg mb-2">Search Messages</h4>
+            <p className="text-sm text-base-content/60 mb-4">
+              Find messages in this conversation
+            </p>
+            <div className="text-xs text-base-content/50 max-w-sm mx-auto">
+              <p className="mb-2">💡 <strong>Tips:</strong></p>
+              <ul className="text-left space-y-1">
+                <li>• Search for keywords</li>
+                <li>• Search for user names</li>
+                <li>• Results appear as you type</li>
+              </ul>
+            </div>
+          </div>
+        ) : searchResults.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-base-300/50 flex items-center justify-center">
+              <MessageSquare size={40} className="text-base-content/30" />
+            </div>
+            <h4 className="font-bold text-lg mb-2">No results found</h4>
+            <p className="text-sm text-base-content/60">
+              Try different keywords or check your spelling
+            </p>
           </div>
         ) : (
-          <div className="text-center py-8 text-base-content/50 text-sm">
-            Enter a search term to find messages
+          <div className="space-y-3">
+            {searchResults.map((result) => {
+              const message = result.message;
+              return (
+                <div
+                  key={message.id}
+                  onClick={() => jumpToMessage(message.id)}
+                  className="card bg-base-200 shadow-md hover:shadow-lg transition-all cursor-pointer border border-primary/20 hover:border-primary/40"
+                >
+                  <div className="card-body p-4">
+                    {/* Message Header */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="avatar">
+                        <div className="w-10 h-10 rounded-full ring-2 ring-primary/30">
+                          <img
+                            src={
+                              message.user?.image ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                message.user?.name || "User"
+                              )}&background=random`
+                            }
+                            alt={message.user?.name}
+                            onError={(e) => {
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                message.user?.name || "User"
+                              )}&background=random`;
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">
+                          {message.user?.name || "Unknown User"}
+                        </p>
+                        <p className="text-xs text-base-content/60 flex items-center gap-1">
+                          <Calendar size={12} />
+                          {formatTime(message.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Message Content with Highlighting */}
+                    <div className="bg-base-100 rounded-lg p-3">
+                      <p className="text-sm break-words whitespace-pre-wrap">
+                        {highlightText(message.text || "No text", searchQuery)}
+                      </p>
+
+                      {/* Attachments indicator */}
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 flex items-center gap-2 text-xs text-base-content/50">
+                          <MessageSquare size={12} />
+                          <span>{message.attachments.length} attachment(s)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Click to view */}
+                    <div className="mt-2 text-xs text-primary flex items-center gap-1">
+                      <MessageSquare size={12} />
+                      <span>Click to view in chat</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Custom styles for message highlighting */}
+      <style jsx global>{`
+        .highlight-message {
+          animation: highlightPulse 2s ease-in-out;
+          background-color: hsl(var(--p) / 0.2) !important;
+        }
+
+        @keyframes highlightPulse {
+          0%, 100% {
+            background-color: transparent;
+          }
+          50% {
+            background-color: hsl(var(--p) / 0.3);
+          }
+        }
+
+        mark {
+          border-radius: 2px;
+          padding: 0 2px;
+        }
+      `}</style>
     </div>
   );
 };

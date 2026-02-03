@@ -1,201 +1,261 @@
-import { UserPlus, MessageSquare, Pin, Edit, Calendar, TrendingUp, Award, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  UserPlus,
+  UserMinus,
+  Users,
+  Crown,
+  Shield,
+  Edit,
+  MessageSquare,
+  Calendar,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  LogOut,
+  Trash2,
+  Clock,
+} from "lucide-react";
 
-const ActivityTimelinePanel = ({ group }) => {
-  // Mock activity data - in real app, fetch from API
-  const activities = [
-    {
-      id: 1,
-      type: "member_joined",
-      user: { name: "Sarah Chen", image: "https://via.placeholder.com/40" },
-      timestamp: new Date(Date.now() - 3600000),
-      description: "joined the group",
-    },
-    {
-      id: 2,
-      type: "message_pinned",
-      user: { name: "Admin", image: "https://via.placeholder.com/40" },
-      timestamp: new Date(Date.now() - 7200000),
-      description: "pinned a message",
-    },
-    {
-      id: 3,
-      type: "members_milestone",
-      timestamp: new Date(Date.now() - 86400000),
-      description: "Group reached 50 members! 🎉",
-      count: 50,
-    },
-    {
-      id: 4,
-      type: "group_updated",
-      user: { name: "John Admin", image: "https://via.placeholder.com/40" },
-      timestamp: new Date(Date.now() - 172800000),
-      description: "updated group settings",
-    },
-    {
-      id: 5,
-      type: "practice_session",
-      timestamp: new Date(Date.now() - 259200000),
-      description: "Group practice session completed",
-      participants: 12,
-    },
-    {
-      id: 6,
-      type: "member_joined",
-      user: { name: "Mike Rodriguez", image: "https://via.placeholder.com/40" },
-      timestamp: new Date(Date.now() - 345600000),
-      description: "joined the group",
-    },
-    {
-      id: 7,
-      type: "achievement",
-      timestamp: new Date(Date.now() - 432000000),
-      description: "Group completed 100 practice sessions! 🏆",
-    },
-    {
-      id: 8,
-      type: "member_joined",
-      user: { name: "Emma Thompson", image: "https://via.placeholder.com/40" },
-      timestamp: new Date(Date.now() - 518400000),
-      description: "joined the group",
-    },
-  ];
+const ActivityTimelinePanel = ({ group, groupId }) => {
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatTimestamp = (timestamp) => {
+  useEffect(() => {
+    if (!group) return;
+
+    // Generate activity timeline from group data
+    const generateActivities = () => {
+      const timeline = [];
+
+      // Group creation
+      if (group.createdAt) {
+        timeline.push({
+          id: `created-${group._id}`,
+          type: "group_created",
+          icon: Users,
+          color: "text-primary",
+          bgColor: "bg-primary/10",
+          title: "Group Created",
+          description: `${group.createdBy?.fullName || "Someone"} created this group`,
+          timestamp: group.createdAt,
+          user: group.createdBy,
+        });
+      }
+
+      // Members joined (current members)
+      group.members?.forEach((member, index) => {
+        if (member._id !== group.createdBy?._id) {
+          timeline.push({
+            id: `member-joined-${member._id}`,
+            type: "member_joined",
+            icon: UserPlus,
+            color: "text-success",
+            bgColor: "bg-success/10",
+            title: "Member Joined",
+            description: `${member.fullName} joined the group`,
+            timestamp: member.joinedAt || group.createdAt,
+            user: member,
+          });
+        }
+      });
+
+      // Admin promotions
+      group.admins?.forEach((admin) => {
+        if (admin._id !== group.createdBy?._id) {
+          timeline.push({
+            id: `admin-promoted-${admin._id}`,
+            type: "admin_promoted",
+            icon: Shield,
+            color: "text-info",
+            bgColor: "bg-info/10",
+            title: "Admin Promoted",
+            description: `${admin.fullName} was promoted to admin`,
+            timestamp: admin.promotedAt || group.createdAt,
+            user: admin,
+          });
+        }
+      });
+
+      // Pending requests
+      group.pendingRequests?.forEach((request) => {
+        timeline.push({
+          id: `request-pending-${request.userId._id}`,
+          type: "join_request",
+          icon: Clock,
+          color: "text-warning",
+          bgColor: "bg-warning/10",
+          title: "Join Request",
+          description: `${request.userId.fullName} requested to join`,
+          timestamp: request.requestedAt || new Date(),
+          user: request.userId,
+        });
+      });
+
+      // Sort by timestamp (newest first)
+      timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      setActivities(timeline);
+      setLoading(false);
+    };
+
+    generateActivities();
+  }, [group]);
+
+  const getRelativeTime = (timestamp) => {
     const now = new Date();
-    const date = new Date(timestamp);
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const past = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - past) / 1000);
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
+    return past.toLocaleDateString();
   };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case "member_joined":
-        return <UserPlus size={16} className="text-success" />;
-      case "message_pinned":
-        return <Pin size={16} className="text-warning" />;
-      case "group_updated":
-        return <Edit size={16} className="text-info" />;
-      case "practice_session":
-        return <Calendar size={16} className="text-primary" />;
-      case "members_milestone":
-        return <Users size={16} className="text-secondary" />;
-      case "achievement":
-        return <Award size={16} className="text-accent" />;
-      default:
-        return <TrendingUp size={16} className="text-base-content/50" />;
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg text-primary"></span>
+          <p className="mt-4 text-sm text-base-content/60">Loading activity...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const getActivityColor = (type) => {
-    switch (type) {
-      case "member_joined":
-        return "border-success/20 bg-success/5";
-      case "message_pinned":
-        return "border-warning/20 bg-warning/5";
-      case "group_updated":
-        return "border-info/20 bg-info/5";
-      case "practice_session":
-        return "border-primary/20 bg-primary/5";
-      case "members_milestone":
-        return "border-secondary/20 bg-secondary/5";
-      case "achievement":
-        return "border-accent/20 bg-accent/5";
-      default:
-        return "border-base-300 bg-base-100";
-    }
-  };
+  if (activities.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <TrendingUp size={32} className="text-primary/50" />
+        </div>
+        <p className="text-sm text-base-content/50 font-medium">No activity yet</p>
+        <p className="text-xs text-base-content/40 mt-1">
+          Group activity will appear here
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h4 className="font-semibold mb-1">Activity Timeline</h4>
-        <p className="text-sm text-base-content/60">Recent group activities and events</p>
-      </div>
-
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="p-3 bg-primary/10 rounded-lg text-center">
-          <div className="text-lg font-bold text-primary">5</div>
-          <div className="text-xs text-base-content/60">New members this week</div>
-        </div>
-        <div className="p-3 bg-secondary/10 rounded-lg text-center">
-          <div className="text-lg font-bold text-secondary">24</div>
-          <div className="text-xs text-base-content/60">Messages today</div>
-        </div>
-      </div>
-
-      {/* Timeline */}
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {activities.map((activity, index) => (
-          <div
-            key={activity.id}
-            className={`relative p-3 rounded-lg border ${getActivityColor(activity.type)} transition-all hover:scale-[1.02]`}
-          >
-            {/* Timeline connector */}
-            {index !== activities.length - 1 && (
-              <div className="absolute left-6 top-12 w-0.5 h-8 bg-base-300"></div>
-            )}
-
-            <div className="flex items-start gap-3">
-              {/* Icon */}
-              <div className="w-8 h-8 rounded-full bg-base-100 border border-base-300 flex items-center justify-center flex-shrink-0 relative z-10">
-                {getActivityIcon(activity.type)}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {activity.user && (
-                      <img
-                        src={activity.user.image}
-                        alt={activity.user.name}
-                        className="w-5 h-5 rounded-full"
-                      />
-                    )}
-                    <span className="text-sm">
-                      {activity.user && (
-                        <span className="font-semibold">{activity.user.name} </span>
-                      )}
-                      <span className="text-base-content/70">{activity.description}</span>
-                    </span>
-                  </div>
-                  <span className="text-xs text-base-content/50 whitespace-nowrap flex-shrink-0">
-                    {formatTimestamp(activity.timestamp)}
-                  </span>
-                </div>
-
-                {/* Additional info */}
-                {activity.count && (
-                  <div className="text-xs text-base-content/60 mt-1">
-                    <Users size={12} className="inline mr-1" />
-                    {activity.count} members
-                  </div>
-                )}
-                {activity.participants && (
-                  <div className="text-xs text-base-content/60 mt-1">
-                    <UserPlus size={12} className="inline mr-1" />
-                    {activity.participants} participants
-                  </div>
-                )}
-              </div>
-            </div>
+    <div className="space-y-4 animate-fadeIn">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="stat bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-3 border border-primary/20">
+          <div className="stat-title text-xs opacity-70">Members</div>
+          <div className="stat-value text-2xl text-primary">
+            {group.members?.length || 0}
           </div>
-        ))}
+        </div>
+        <div className="stat bg-gradient-to-br from-success/10 to-success/5 rounded-xl p-3 border border-success/20">
+          <div className="stat-title text-xs opacity-70">Admins</div>
+          <div className="stat-value text-2xl text-success">
+            {group.admins?.length || 0}
+          </div>
+        </div>
+        <div className="stat bg-gradient-to-br from-warning/10 to-warning/5 rounded-xl p-3 border border-warning/20">
+          <div className="stat-title text-xs opacity-70">Pending</div>
+          <div className="stat-value text-2xl text-warning">
+            {group.pendingRequests?.length || 0}
+          </div>
+        </div>
       </div>
 
-      {/* Load more */}
-      <button className="btn btn-ghost btn-sm btn-block">
-        Load more activity
-      </button>
+      {/* Activity Timeline */}
+      <div className="space-y-3">
+        <h4 className="font-bold text-lg flex items-center gap-2 mb-4">
+          <TrendingUp size={20} className="text-primary" />
+          Activity Timeline
+        </h4>
+
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-[23px] top-0 bottom-0 w-0.5 bg-base-300"></div>
+
+          {/* Activity items */}
+          <div className="space-y-4">
+            {activities.map((activity, index) => {
+              const Icon = activity.icon;
+              return (
+                <div
+                  key={activity.id}
+                  className="relative flex gap-4 group"
+                  style={{
+                    animation: `fadeInUp 0.3s ease-out ${index * 0.05}s backwards`,
+                  }}
+                >
+                  {/* Icon */}
+                  <div
+                    className={`flex-shrink-0 w-12 h-12 rounded-xl ${activity.bgColor} ${activity.color} flex items-center justify-center z-10 ring-4 ring-base-100 group-hover:scale-110 transition-transform shadow-md`}
+                  >
+                    <Icon size={20} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 bg-base-200/50 rounded-xl p-4 border border-base-300/50 group-hover:bg-base-200 group-hover:shadow-md transition-all">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h5 className="font-semibold text-sm">{activity.title}</h5>
+                        <p className="text-xs text-base-content/70 mt-1 break-words">
+                          {activity.description}
+                        </p>
+                      </div>
+                      {activity.user && (
+                        <div className="avatar flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full ring-2 ring-primary/20">
+                            <img
+                              src={
+                                activity.user.profilePic ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                  activity.user.fullName || "User"
+                                )}&background=random`
+                              }
+                              alt={activity.user.fullName}
+                              onError={(e) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                  activity.user.fullName || "User"
+                                )}&background=random`;
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-base-content/50 flex-wrap">
+                      <Calendar size={12} />
+                      <span>{getRelativeTime(activity.timestamp)}</span>
+                      <span>•</span>
+                      <span className="hidden sm:inline">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </span>
+                      <span className="sm:hidden">
+                        {new Date(activity.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Animation keyframes */}
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };

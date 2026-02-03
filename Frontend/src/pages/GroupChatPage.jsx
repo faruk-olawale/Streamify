@@ -55,6 +55,8 @@ import MessageSearchPanel from "../component/MessageSearchPanel";
 import ActivityTimelinePanel from "../component/ActivityTimelinePanel";
 import QuickActionsMenu from "../component/QuickActionsMenu";
 import CustomSendButton from "../component/CustomSendButton";
+import MediaGallery from "../component/MediaGallery";
+import SharedFiles from "../component/SharedFiles";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
@@ -530,82 +532,33 @@ const GroupChatPage = ({ authUser }) => {
           </div>
         );
 
-      case "media":
-        return (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2 mb-2">
-              <ImageIcon size={20} className="text-primary" />
-              <h4 className="font-bold text-lg">Media Gallery</h4>
-            </div>
-            <p className="text-sm text-base-content/60 mb-4">
-              All images and videos shared in this group
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={i}
-                  className="aspect-square bg-gradient-to-br from-base-300 to-base-200 rounded-xl animate-pulse shadow-inner border border-base-300/50"
-                ></div>
-              ))}
-            </div>
-            <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <ImageIcon size={32} className="text-primary/50" />
-              </div>
-              <p className="text-sm text-base-content/50 font-medium">
-                No media shared yet
-              </p>
-              <p className="text-xs text-base-content/40 mt-1">
-                Share photos and videos in the chat
-              </p>
-            </div>
-          </div>
-        );
+    case "media":
+  return (
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex items-center gap-2 mb-2">
+        <ImageIcon size={20} className="text-primary" />
+        <h4 className="font-bold text-lg">Media Gallery</h4>
+      </div>
+      <p className="text-sm text-base-content/60 mb-4">
+        All images and videos shared in this group
+      </p>
+      <MediaGallery channel={channel} />
+    </div>
+  );
 
-      case "files":
-        return (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText size={20} className="text-primary" />
-              <h4 className="font-bold text-lg">Shared Files</h4>
-            </div>
-            <p className="text-sm text-base-content/60 mb-4">
-              All documents shared in this group
-            </p>
-            <div className="space-y-2">
-              {[
-                {
-                  name: "Spanish_Grammar_Guide.pdf",
-                  size: "2.4 MB",
-                  date: "2 days ago",
-                },
-                {
-                  name: "Vocabulary_List.docx",
-                  size: "150 KB",
-                  date: "1 week ago",
-                },
-              ].map((file, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-4 p-4 bg-base-200/50 rounded-xl border border-base-300/50 hover:bg-base-200 hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                    <FileText size={24} className="text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate mb-0.5">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-base-content/50">
-                      {file.size} • {file.date}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-
+case "files":
+  return (
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex items-center gap-2 mb-2">
+        <FileText size={20} className="text-primary" />
+        <h4 className="font-bold text-lg">Shared Files</h4>
+      </div>
+      <p className="text-sm text-base-content/60 mb-4">
+        All documents shared in this group
+      </p>
+      <SharedFiles channel={channel} />
+    </div>
+  );
       case "activity":
         return <ActivityTimelinePanel group={group} groupId={groupId} />;
 
@@ -664,7 +617,7 @@ const GroupChatPage = ({ authUser }) => {
               <Search size={18} />
             </button>
 
-            {/* <button
+            <button
               onClick={() => setShowPinnedMessages(!showPinnedMessages)}
               className={`btn btn-sm btn-circle ${
                 showPinnedMessages ? "btn-warning" : "btn-ghost"
@@ -672,7 +625,7 @@ const GroupChatPage = ({ authUser }) => {
               title="Pinned messages"
             >
               <Pin size={18} />
-            </button> */}
+            </button>
 
             <button
               onClick={() => setShowSettings(!showSettings)}

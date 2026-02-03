@@ -1,41 +1,76 @@
 import { useState, useEffect } from "react";
-import { X, Pin, Trash2, MessageSquare, AlertCircle } from "lucide-react";
+import { Pin, X, Trash2, User, Calendar, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
-import { pinMessage, unpinMessage, getPinnedMessages } from "../lib/api";
 
-const PinnedMessagesPanel = ({ channel, onClose, groupId, userRole }) => {
+const PinnedMessagesPanel = ({ channel, groupId, userRole, onClose }) => {
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadPinnedMessages();
-  }, [groupId]);
+    if (!channel) return;
 
-  const loadPinnedMessages = async () => {
-    try {
+    const fetchPinnedMessages = async () => {
       setLoading(true);
-      setError(null);
-      
-      // Get pinned messages from your backend
-      const extractedGroupId = groupId || channel.id.split('messaging:')[1];
-      const result = await getPinnedMessages(extractedGroupId);
-      
-      setPinnedMessages(result.pinnedMessages || []);
-    } catch (error) {
-      console.error("Error loading pinned messages:", error);
-      setError("Failed to load pinned messages");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        // Query for pinned messages
+        const response = await channel.query({
+          messages: { limit: 100 },
+        });
 
-  const handleUnpin = async (messageId) => {
+        // Filter pinned messages
+        const pinned = response.messages.filter((msg) => msg.pinned === true);
+        
+        // Sort by pinned_at timestamp (newest first)
+        pinned.sort((a, b) => {
+          const timeA = a.pinned_at ? new Date(a.pinned_at) : new Date(a.created_at);
+          const timeB = b.pinned_at ? new Date(b.pinned_at) : new Date(b.created_at);
+          return timeB - timeA;
+        });
+
+        setPinnedMessages(pinned);
+      } catch (error) {
+        console.error("Error fetching pinned messages:", error);
+        toast.error("Failed to load pinned messages");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPinnedMessages();
+
+    // Listen for new pins/unpins
+    const handleEvent = (event) => {
+      if (event.type === "message.updated") {
+        if (event.message.pinned) {
+          // Message was pinned
+          setPinnedMessages((prev) => {
+            const exists = prev.find((msg) => msg.id === event.message.id);
+            if (exists) {
+              return prev.map((msg) =>
+                msg.id === event.message.id ? event.message : msg
+              );
+            }
+            return [event.message, ...prev];
+          });
+        } else {
+          // Message was unpinned
+          setPinnedMessages((prev) =>
+            prev.filter((msg) => msg.id !== event.message.id)
+          );
+        }
+      }
+    };
+
+    channel.on("message.updated", handleEvent);
+
+    return () => {
+      channel.off("message.updated", handleEvent);
+    };
+  }, [channel]);
+
+  const unpinMessage = async (messageId) => {
     try {
-      const extractedGroupId = groupId || channel.id.split('messaging:')[1];
-      await unpinMessage(extractedGroupId, messageId);
-      
-      setPinnedMessages((prev) => prev.filter((msg) => msg.messageId !== messageId));
+      await channel.unpinMessage({ id: messageId });
       toast.success("Message unpinned");
     } catch (error) {
       console.error("Error unpinning message:", error);
@@ -45,176 +80,221 @@ const PinnedMessagesPanel = ({ channel, onClose, groupId, userRole }) => {
 
   const jumpToMessage = async (messageId) => {
     try {
-      // Jump to message in Stream Chat
-      await channel.state.loadMessageIntoState(messageId);
-      toast.info("Jumped to message");
+      // This will scroll to the message in the chat
+      const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        messageElement.classList.add("highlight-message");
+        setTimeout(() => {
+          messageElement.classList.remove("highlight-message");
+        }, 2000);
+      }
       onClose();
     } catch (error) {
       console.error("Error jumping to message:", error);
-      toast.error("Could not find message");
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - date;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffInSeconds = Math.floor((now - date) / 1000);
 
-    if (diffHours < 1) return "Just now";
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
     return date.toLocaleDateString();
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 bg-gradient-to-b from-warning/5 to-transparent">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Pin size={18} className="text-warning" />
-            <h4 className="font-semibold">Pinned Messages</h4>
-          </div>
-          <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="flex items-center justify-center py-8">
-          <span className="loading loading-spinner loading-md text-warning"></span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 bg-gradient-to-b from-error/5 to-transparent">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Pin size={18} className="text-error" />
-            <h4 className="font-semibold">Pinned Messages</h4>
-          </div>
-          <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <AlertCircle size={32} className="text-error/50" />
-          <p className="text-sm text-error/70">{error}</p>
-          <button 
-            onClick={loadPinnedMessages}
-            className="btn btn-sm btn-outline btn-error"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 bg-gradient-to-b from-warning/5 to-transparent border-b border-warning/10">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-warning/10 rounded-lg">
-            <Pin size={16} className="text-warning" />
+    <div className="absolute top-0 left-0 right-0 bottom-0 bg-base-100 z-30 flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-warning/20 to-warning/10 border-b-2 border-warning/30 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-warning/20 rounded-lg">
+              <Pin size={20} className="text-warning" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Pinned Messages</h3>
+              <p className="text-xs text-base-content/60">
+                {pinnedMessages.length} {pinnedMessages.length === 1 ? "message" : "messages"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-sm">Pinned Messages</h4>
-            {pinnedMessages.length > 0 && (
-              <p className="text-xs text-base-content/50">{pinnedMessages.length} pinned</p>
-            )}
-          </div>
+          <button
+            onClick={onClose}
+            className="btn btn-ghost btn-sm btn-circle hover:bg-error/10 hover:text-error"
+          >
+            <X size={20} />
+          </button>
         </div>
-        <button 
-          onClick={onClose} 
-          className="btn btn-ghost btn-xs btn-circle hover:bg-base-300 transition-colors"
-        >
-          <X size={16} />
-        </button>
       </div>
 
-      {pinnedMessages.length === 0 ? (
-        <div className="text-center py-8 px-4">
-          <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-warning/10 flex items-center justify-center">
-            <Pin size={24} className="text-warning/50" />
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="text-center">
+              <span className="loading loading-spinner loading-lg text-primary"></span>
+              <p className="mt-4 text-sm text-base-content/60">Loading pinned messages...</p>
+            </div>
           </div>
-          <p className="text-sm text-base-content/60 font-medium mb-1">No pinned messages</p>
-          <p className="text-xs text-base-content/40">
-            Admins can pin important messages to show them here
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {pinnedMessages.map((message) => (
-            <div
-              key={message.messageId || message._id}
-              className="group p-3 bg-base-100/80 backdrop-blur-sm rounded-lg border border-warning/20 hover:border-warning/40 hover:shadow-md transition-all duration-200"
-            >
-              <div className="flex items-start gap-3 mb-2">
-                <div className="avatar flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full ring-1 ring-warning/20">
-                    <img
-                      src={message.pinnedBy?.profilePic || "https://via.placeholder.com/40"}
-                      alt={message.pinnedBy?.fullName || "User"}
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          message.pinnedBy?.fullName || "User"
-                        )}&background=random`;
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-sm text-base-content">
-                      {message.pinnedBy?.fullName || "Someone"}
-                    </span>
-                    <span className="text-xs text-base-content/40">•</span>
-                    <span className="text-xs text-base-content/50">
-                      {formatDate(message.pinnedAt || message.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-base-content/80 break-words whitespace-pre-wrap">
-                    {message.text || "Message content"}
-                  </p>
-                </div>
-              </div>
+        ) : pinnedMessages.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-warning/10 flex items-center justify-center">
+              <Pin size={40} className="text-warning/50" />
+            </div>
+            <h4 className="font-bold text-lg mb-2">No pinned messages</h4>
+            <p className="text-sm text-base-content/60 mb-4">
+              Important messages can be pinned here
+            </p>
+            <div className="text-xs text-base-content/50 max-w-sm mx-auto">
+              <p className="mb-2">💡 <strong>How to pin:</strong></p>
+              <ol className="text-left space-y-1">
+                <li>• Long press a message (mobile)</li>
+                <li>• Right click a message (desktop)</li>
+                <li>• Select "Pin Message"</li>
+              </ol>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pinnedMessages.map((message) => (
+              <div
+                key={message.id}
+                className="card bg-base-200 shadow-md hover:shadow-lg transition-all border border-warning/20 hover:border-warning/40"
+              >
+                <div className="card-body p-4">
+                  {/* Message Header */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="avatar">
+                        <div className="w-10 h-10 rounded-full ring-2 ring-warning/30">
+                          <img
+                            src={
+                              message.user?.image ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                message.user?.name || "User"
+                              )}&background=random`
+                            }
+                            alt={message.user?.name}
+                            onError={(e) => {
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                message.user?.name || "User"
+                              )}&background=random`;
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">
+                          {message.user?.name || "Unknown User"}
+                        </p>
+                        <p className="text-xs text-base-content/60 flex items-center gap-1">
+                          <Calendar size={12} />
+                          {formatTime(message.created_at)}
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-base-300/50">
-                <span className="text-xs text-base-content/40">
-                  Pinned by {message.pinnedBy?.fullName || "admin"}
-                </span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => jumpToMessage(message.messageId)}
-                    className="btn btn-ghost btn-xs gap-1 text-primary hover:bg-primary/10"
-                    title="Jump to message"
-                  >
-                    <MessageSquare size={12} />
-                    <span className="hidden sm:inline">Jump</span>
-                  </button>
-                  {userRole?.isAdmin && (
+                    {/* Pin indicator */}
+                    <div className="badge badge-warning badge-sm gap-1">
+                      <Pin size={12} />
+                      Pinned
+                    </div>
+                  </div>
+
+                  {/* Message Content */}
+                  <div className="bg-base-100 rounded-lg p-3 mb-3">
+                    <p className="text-sm break-words whitespace-pre-wrap">
+                      {message.text || message.html || "No text content"}
+                    </p>
+
+                    {/* Attachments */}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {message.attachments.map((attachment, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 bg-base-200 rounded-lg"
+                          >
+                            {attachment.type === "image" && (
+                              <img
+                                src={attachment.image_url || attachment.thumb_url}
+                                alt="attachment"
+                                className="w-full h-auto max-h-48 object-cover rounded-lg"
+                              />
+                            )}
+                            {attachment.type === "file" && (
+                              <div className="flex items-center gap-2">
+                                <MessageSquare size={16} className="text-primary" />
+                                <span className="text-xs truncate">
+                                  {attachment.title || "File attachment"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        if (confirm("Unpin this message?")) {
-                          handleUnpin(message.messageId);
-                        }
-                      }}
-                      className="btn btn-ghost btn-xs gap-1 text-error hover:bg-error/10"
-                      title="Unpin"
+                      onClick={() => jumpToMessage(message.id)}
+                      className="btn btn-sm btn-ghost flex-1 gap-2"
                     >
-                      <Trash2 size={12} />
-                      <span className="hidden sm:inline">Unpin</span>
+                      <MessageSquare size={16} />
+                      View in Chat
                     </button>
+                    {userRole?.isAdmin && (
+                      <button
+                        onClick={() => unpinMessage(message.id)}
+                        className="btn btn-sm btn-ghost gap-2 text-error hover:bg-error/10"
+                      >
+                        <Trash2 size={16} />
+                        Unpin
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Pinned by info */}
+                  {message.pinned_by && (
+                    <div className="mt-2 pt-2 border-t border-base-300">
+                      <p className="text-xs text-base-content/50">
+                        Pinned by{" "}
+                        <span className="font-semibold">
+                          {message.pinned_by.name || "Admin"}
+                        </span>
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Custom styles for message highlighting */}
+      <style jsx global>{`
+        .highlight-message {
+          animation: highlightPulse 2s ease-in-out;
+          background-color: hsl(var(--wa) / 0.2) !important;
+        }
+
+        @keyframes highlightPulse {
+          0%, 100% {
+            background-color: transparent;
+          }
+          50% {
+            background-color: hsl(var(--wa) / 0.3);
+          }
+        }
+      `}</style>
     </div>
   );
 };
