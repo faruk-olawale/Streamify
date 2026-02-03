@@ -255,81 +255,98 @@ const GroupChatPage = ({ authUser }) => {
         return (
           <div className="space-y-6 animate-fadeIn">
             {/* Group Info Card */}
-            <div className="card bg-gradient-to-br from-base-100 to-base-200/50 shadow-md border border-base-300/50">
-              <div className="card-body p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-bold text-lg flex items-center gap-2">
-                    <Hash size={20} className="text-primary" />
-                    About Group
-                  </h4>
-                  {userRole?.isAdmin && (
-                    <button
-                      onClick={() => {
-                        setShowEditModal(true);
-                        setShowSettings(false);
-                      }}
-                      className="btn btn-ghost btn-sm gap-2 hover:bg-primary/10 hover:text-primary transition-all"
-                    >
-                      <Edit size={16} />
-                      <span className="hidden sm:inline">Edit</span>
-                    </button>
-                  )}
-                </div>
+<div className="card bg-base-100 border border-base-300/40 shadow-lg rounded-2xl">
+  <div className="card-body p-6 space-y-6">
 
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="avatar">
-                    <div className="w-20 h-20 rounded-2xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-100">
-                      <img
-                        src={group.image || "https://via.placeholder.com/150?text=Group"}
-                        alt={group.name}
-                        onError={(e) => {
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            group.name
-                          )}&background=random&bold=true`;
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h5 className="font-bold text-xl mb-1 truncate">{group.name}</h5>
-                    <div className="flex items-center gap-3 text-sm text-base-content/60 mb-2">
-                      <div className="flex items-center gap-1">
-                        <Users size={14} />
-                        <span className="font-medium">
-                          {group.members?.length || 0} members
-                        </span>
-                      </div>
-                      {group.createdAt && (
-                        <>
-                          <span>•</span>
-                          <span>
-                            Created {new Date(group.createdAt).toLocaleDateString()}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
+    {/* HEADER */}
+    <div className="flex items-center justify-between">
+      <h4 className="text-base font-semibold flex items-center gap-2">
+        <Hash size={18} className="text-primary" />
+        Group information
+      </h4>
 
-                {group.description && (
-                  <div className="p-3 bg-base-200/50 rounded-lg border border-base-300/30">
-                    <p className="text-sm text-base-content/80 leading-relaxed">
-                      {group.description}
-                    </p>
-                  </div>
-                )}
+      {userRole?.isAdmin && (
+        <button
+          onClick={() => {
+            setShowEditModal(true);
+            setShowSettings(false);
+          }}
+          className="btn btn-ghost btn-sm text-base-content/60 hover:text-primary"
+        >
+          <Edit size={16} />
+        </button>
+      )}
+    </div>
 
-                <div className="flex items-center gap-2 mt-3 p-3 bg-warning/5 rounded-lg border border-warning/10">
-                  <Crown size={16} className="text-warning flex-shrink-0" />
-                  <span className="text-sm text-base-content/70">
-                    Created by{" "}
-                    <span className="font-semibold text-base-content">
-                      {group.createdBy?.fullName}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </div>
+    {/* GROUP IDENTITY */}
+    <div className="flex items-start gap-4">
+      <div className="avatar">
+        <div className="w-20 h-20 rounded-xl ring-2 ring-primary/20 ring-offset-2 ring-offset-base-100 overflow-hidden">
+          <img
+            src={group.image || "https://via.placeholder.com/150?text=Group"}
+            alt={group.name}
+            onError={(e) => {
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                group.name
+              )}&background=random&bold=true`;
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <h5 className="text-xl font-bold truncate">
+          {group.name}
+        </h5>
+
+        <div className="mt-2">
+          <span className="badge badge-outline gap-1 text-xs">
+            <Users size={12} />
+            {group.members?.length || 0} members
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {/* DESCRIPTION */}
+    {group.description && (
+      <div>
+        <p className="text-xs font-medium text-base-content/60 mb-1">
+          ABOUT
+        </p>
+
+        <div className="bg-base-200/60 border border-base-300/40 rounded-xl p-4">
+          <p className="text-sm leading-relaxed text-base-content/80">
+            {group.description}
+          </p>
+        </div>
+      </div>
+    )}
+
+    {/* CREATION INFO */}
+    <div className="flex items-center gap-3 p-4 bg-warning/5 border border-warning/10 rounded-xl">
+      <Crown size={18} className="text-warning shrink-0" />
+
+      <p className="text-sm text-base-content/70">
+        Group created by{" "}
+        <span className="font-semibold text-base-content">
+          {group.createdBy?.fullName}
+        </span>
+        {group.createdAt && (
+          <>
+            {" "} <br />on{" "}
+            <span className="font-medium text-base-content/80">
+              {new Date(group.createdAt).toLocaleDateString()}
+            </span>
+          </>
+        )}
+      </p>
+    </div>
+
+  </div>
+</div>
+
+
 
             {/* Add Members Button */}
             {userRole?.isAdmin && (
