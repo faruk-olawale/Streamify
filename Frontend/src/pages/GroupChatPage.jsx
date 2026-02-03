@@ -598,7 +598,7 @@ const GroupChatPage = ({ authUser }) => {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-base-100 via-base-200/30 to-base-100 overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-base-100 via-base-200/30 to-base-100 overflow-hidden">
       {/* HEADER - THIS WAS MISSING */}
       <div className="bg-gradient-to-r from-base-200/80 to-base-300/50 backdrop-blur-xl p-4 flex items-center justify-between border-b-2 border-primary/10 shadow-lg flex-shrink-0">
         <div className="flex items-center gap-3 flex-1 min-w-0">
