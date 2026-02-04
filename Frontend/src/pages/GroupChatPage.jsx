@@ -908,9 +908,12 @@ case "files":
         />
       )}
 
-      {showQuickActions && (
+     {showQuickActions && (
         <QuickActionsMenu
           group={group}
+          channel={channel}
+          userRole={userRole}
+          authUser={authUser}
           onClose={() => setShowQuickActions(false)}
         />
       )}
