@@ -45,16 +45,24 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
 
       // Store the message text
       const messageText = message.trim();
+      const scheduleTimeISO = scheduledDateTime.toISOString();
 
-      // Set timeout to send message
+      // Set timeout to send message at the scheduled time
       setTimeout(async () => {
         try {
+          // Send the actual message
           await channel.sendMessage({
             text: messageText,
-            scheduled_message: true,
-            original_schedule_time: scheduledDateTime.toISOString(),
+            attachments: [
+              {
+                type: 'scheduled_message',
+                title: 'Scheduled Message',
+                text: `Originally scheduled for: ${formattedTime}`,
+                scheduled_for: scheduleTimeISO,
+              },
+            ],
           });
-          console.log("Scheduled message sent successfully");
+          console.log("Scheduled message sent successfully at:", new Date());
         } catch (error) {
           console.error("Failed to send scheduled message:", error);
         }
@@ -66,12 +74,16 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
         { duration: 4000 }
       );
 
-      // Send immediate confirmation message to the channel (optional)
-      await channel.sendMessage({
-        text: `⏰ Scheduled message set for ${formattedTime}`,
-        type: 'system',
-        silent: true,
-      });
+      // Optionally send immediate confirmation to the channel
+      try {
+        await channel.sendMessage({
+          text: `⏰ Message scheduled for ${formattedTime}`,
+          silent: true,
+        });
+      } catch (error) {
+        console.log("Confirmation message skipped:", error.message);
+        // Don't fail if confirmation message can't be sent
+      }
 
       onClose();
     } catch (error) {
@@ -198,6 +210,17 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
                 </div>
               </div>
             )}
+
+            {/* Browser Warning */}
+            {scheduleDate && scheduleTime && (
+              <div className="alert alert-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div className="text-xs">
+                  <p className="font-semibold">Keep this tab open!</p>
+                  <p>Closing the browser will cancel scheduled messages.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -230,7 +253,7 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;

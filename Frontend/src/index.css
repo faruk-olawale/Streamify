@@ -222,3 +222,5 @@ body {
   .str-chat__message-simple-text-inner { font-size: 0.9rem; }
   .str-chat__message-input { @apply p-3; }
 }
+
+

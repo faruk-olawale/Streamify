@@ -1,5 +1,8 @@
 import { useMemo } from "react";
-import { useMessageContext } from "stream-chat-react";
+import { 
+  MessageSimple,
+  useMessageContext 
+} from "stream-chat-react";
 import PollMessage from "./PollMessage";
 
 const CustomMessage = ({ authUser }) => {
@@ -21,21 +24,19 @@ const CustomMessage = ({ authUser }) => {
   // If it's a poll, render the custom poll component
   if (pollData) {
     return (
-      <div className="custom-message-wrapper">
+      <div className="str-chat__message-simple-wrapper">
         <PollMessage 
           pollData={pollData}
+          messageId={message.id}
           currentUserId={authUser?._id}
-          onVote={(selectedOptions) => {
-            console.log('Vote submitted:', selectedOptions);
-            // Implement vote handling here
-          }}
+          channel={message.channel}
         />
       </div>
     );
   }
 
-  // For non-poll messages, return null to use default Stream Chat rendering
-  return null;
+  // For non-poll messages, use default Stream Chat rendering
+  return <MessageSimple />;
 };
 
 export default CustomMessage;

@@ -1,107 +1,107 @@
 import { useState } from "react";
-import { X, Clock, Send, Calendar } from "lucide-react";
+import { X, Plus, Trash2, MessageSquarePlus, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
-const ScheduleMessageModal = ({ channel, onClose }) => {
-  const [message, setMessage] = useState("");
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
+const CreatePollModal = ({ channel, onClose }) => {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(["", ""]);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSchedule = async () => {
-    if (!message.trim()) {
-      toast.error("Please enter a message");
+  const addOption = () => {
+    if (options.length < 10) {
+      setOptions([...options, ""]);
+    } else {
+      toast.error("Maximum 10 options allowed");
+    }
+  };
+
+  const removeOption = (index) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
+    } else {
+      toast.error("Minimum 2 options required");
+    }
+  };
+
+  const updateOption = (index, value) => {
+    const newOptions = [...options];
+    newOptions[index] = value.slice(0, 100);
+    setOptions(newOptions);
+  };
+
+  const handleCreatePoll = async () => {
+    // Validation
+    if (!question.trim()) {
+      toast.error("Please enter a question");
       return;
     }
 
-    if (!scheduleDate || !scheduleTime) {
-      toast.error("Please select date and time");
-      return;
-    }
-
-    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-    const now = new Date();
-
-    if (scheduledDateTime <= now) {
-      toast.error("Please select a future time");
+    const filledOptions = options.filter((opt) => opt.trim());
+    if (filledOptions.length < 2) {
+      toast.error("Please provide at least 2 options");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      
-      // Calculate delay in milliseconds
-      const delay = scheduledDateTime.getTime() - now.getTime();
 
-      // Format the scheduled time for display
-      const formattedTime = scheduledDateTime.toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
+      // Create poll display text
+      let pollText = `📊 **POLL:** ${question}\n\n`;
+      filledOptions.forEach((opt, idx) => {
+        pollText += `${idx + 1}️⃣ ${opt}\n`;
+      });
+      
+      pollText += `\n${allowMultiple ? "✅ Multiple choice" : "⭕ Single choice"}`;
+      pollText += ` • ${isAnonymous ? "🔒 Anonymous" : "👥 Public"}`;
+      pollText += `\n\n💬 Reply with the number of your choice!`;
+
+      // Create poll data structure
+      const pollData = {
+        question: question.trim(),
+        options: filledOptions.map((opt, idx) => ({
+          id: idx + 1,
+          text: opt.trim(),
+          votes: 0,
+          voters: [],
+        })),
+        settings: {
+          allowMultiple,
+          isAnonymous,
+        },
+        createdAt: new Date().toISOString(),
+        totalVotes: 0,
+      };
+
+      // Send poll as a regular message with custom attachment
+      await channel.sendMessage({
+        text: pollText,
+        attachments: [
+          {
+            type: 'poll',
+            title: question.trim(),
+            text: pollText,
+            poll_data: JSON.stringify(pollData),
+          },
+        ],
       });
 
-      // Store the message text
-      const messageText = message.trim();
-      const scheduleTimeISO = scheduledDateTime.toISOString();
-
-      // Set timeout to send message at the scheduled time
-      setTimeout(async () => {
-        try {
-          // Send the actual message
-          await channel.sendMessage({
-            text: messageText,
-            attachments: [
-              {
-                type: 'scheduled_message',
-                title: 'Scheduled Message',
-                text: `Originally scheduled for: ${formattedTime}`,
-                scheduled_for: scheduleTimeISO,
-              },
-            ],
-          });
-          console.log("Scheduled message sent successfully at:", new Date());
-        } catch (error) {
-          console.error("Failed to send scheduled message:", error);
-        }
-      }, delay);
-
-      // Show success message
-      toast.success(
-        `Message scheduled for ${formattedTime}`,
-        { duration: 4000 }
-      );
-
-      // Optionally send immediate confirmation to the channel
-      try {
-        await channel.sendMessage({
-          text: `⏰ Message scheduled for ${formattedTime}`,
-          silent: true,
-        });
-      } catch (error) {
-        console.log("Confirmation message skipped:", error.message);
-        // Don't fail if confirmation message can't be sent
-      }
-
+      toast.success("Poll created successfully! 🎉");
       onClose();
     } catch (error) {
-      console.error("Schedule error:", error);
-      toast.error("Failed to schedule message");
+      console.error("Poll creation error:", error);
+      
+      // Better error messages
+      if (error.message?.includes("StreamChat error")) {
+        toast.error("Failed to send poll to chat. Please try again.");
+      } else {
+        toast.error("Failed to create poll. Check your connection.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Get minimum date (today)
-  const today = new Date().toISOString().split("T")[0];
-  
-  // Get minimum time (current time if today is selected)
-  const now = new Date();
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-    now.getMinutes()
-  ).padStart(2, "0")}`;
 
   return (
     <>
@@ -110,19 +110,19 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
         onClick={onClose}
       ></div>
 
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-scaleIn">
-        <div className="bg-gradient-to-br from-base-100 to-base-200 rounded-3xl shadow-2xl border-2 border-primary/20 max-w-md w-full">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-gradient-to-br from-base-100 to-base-200 rounded-3xl shadow-2xl border-2 border-primary/20 max-w-lg w-full my-8 animate-scaleIn">
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary/20 via-warning/20 to-primary/20 p-5 border-b border-base-300/50">
+          <div className="bg-gradient-to-r from-secondary/20 via-primary/20 to-secondary/20 p-5 border-b border-base-300/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-warning to-primary flex items-center justify-center shadow-lg">
-                  <Clock size={20} className="text-white" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary to-primary flex items-center justify-center shadow-lg">
+                  <MessageSquarePlus size={20} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Schedule Message</h3>
+                  <h3 className="font-bold text-lg">Create Poll</h3>
                   <p className="text-xs text-base-content/60">
-                    Send message at a specific time
+                    Get opinions from group members
                   </p>
                 </div>
               </div>
@@ -136,95 +136,144 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
-            {/* Message Input */}
+          <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {/* Question */}
             <div>
               <label className="label">
-                <span className="label-text font-semibold">Message</span>
+                <span className="label-text font-semibold">
+                  Poll Question <span className="text-error">*</span>
+                </span>
                 <span className="label-text-alt text-base-content/60">
-                  {message.length}/500
-                </span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered w-full h-32 focus:textarea-primary resize-none"
-                placeholder="Type your message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 500))}
-                maxLength={500}
-              />
-            </div>
-
-            {/* Date Input */}
-            <div>
-              <label className="label">
-                <span className="label-text font-semibold flex items-center gap-2">
-                  <Calendar size={16} />
-                  Date
+                  {question.length}/200
                 </span>
               </label>
               <input
-                type="date"
+                type="text"
                 className="input input-bordered w-full focus:input-primary"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-                min={today}
+                placeholder="What's your question?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value.slice(0, 200))}
+                maxLength={200}
               />
             </div>
 
-            {/* Time Input */}
+            {/* Options */}
             <div>
               <label className="label">
-                <span className="label-text font-semibold flex items-center gap-2">
-                  <Clock size={16} />
-                  Time
+                <span className="label-text font-semibold">
+                  Options <span className="text-error">*</span>
                 </span>
+                <button
+                  onClick={addOption}
+                  className="btn btn-ghost btn-xs gap-1"
+                  disabled={options.length >= 10}
+                >
+                  <Plus size={14} />
+                  Add Option
+                </button>
               </label>
-              <input
-                type="time"
-                className="input input-bordered w-full focus:input-primary"
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                min={scheduleDate === today ? currentTime : undefined}
-              />
+              <div className="space-y-2">
+                {options.map((option, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <div className="badge badge-neutral badge-sm w-8 flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <input
+                      type="text"
+                      className="input input-bordered input-sm flex-1 focus:input-primary"
+                      placeholder={`Option ${index + 1}`}
+                      value={option}
+                      onChange={(e) => updateOption(index, e.target.value)}
+                      maxLength={100}
+                    />
+                    {options.length > 2 && (
+                      <button
+                        onClick={() => removeOption(index)}
+                        className="btn btn-ghost btn-sm btn-circle text-error hover:bg-error/10"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-base-content/60 mt-2">
+                {options.filter((opt) => opt.trim()).length} of {options.length}{" "}
+                options filled • Max 10 options
+              </p>
+            </div>
+
+            {/* Settings */}
+            <div className="space-y-3">
+              <label className="label">
+                <span className="label-text font-semibold">Poll Settings</span>
+              </label>
+
+              <div className="card bg-base-200/50 border border-base-300/50">
+                <div className="card-body p-4 space-y-3">
+                  {/* Allow Multiple */}
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center group-hover:bg-info/20 transition-colors">
+                        <CheckCircle size={18} className="text-info" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Multiple Choice</p>
+                        <p className="text-xs text-base-content/60">
+                          Allow selecting multiple options
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="toggle toggle-info"
+                      checked={allowMultiple}
+                      onChange={(e) => setAllowMultiple(e.target.checked)}
+                    />
+                  </label>
+
+                  {/* Anonymous */}
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
+                        <MessageSquarePlus size={18} className="text-secondary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Anonymous Voting</p>
+                        <p className="text-xs text-base-content/60">
+                          Hide who voted for what
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="toggle toggle-secondary"
+                      checked={isAnonymous}
+                      onChange={(e) => setIsAnonymous(e.target.checked)}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Preview */}
-            {scheduleDate && scheduleTime && (
-              <div className="alert alert-info">
-                <Clock size={18} />
+            {question && options.filter((opt) => opt.trim()).length >= 2 && (
+              <div className="alert alert-success">
+                <MessageSquarePlus size={18} />
                 <div className="text-sm">
-                  <p className="font-semibold">Scheduled for:</p>
+                  <p className="font-semibold">Ready to create!</p>
                   <p>
-                    {new Date(
-                      `${scheduleDate}T${scheduleTime}`
-                    ).toLocaleString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    })}
+                    {options.filter((opt) => opt.trim()).length} options •{" "}
+                    {allowMultiple ? "Multiple choice" : "Single choice"} •{" "}
+                    {isAnonymous ? "Anonymous" : "Public"}
                   </p>
-                </div>
-              </div>
-            )}
-
-            {/* Browser Warning */}
-            {scheduleDate && scheduleTime && (
-              <div className="alert alert-warning">
-                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <div className="text-xs">
-                  <p className="font-semibold">Keep this tab open!</p>
-                  <p>Closing the browser will cancel scheduled messages.</p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="p-6 pt-0 flex gap-3">
+          <div className="p-6 pt-0 flex gap-3 border-t border-base-300/50">
             <button
               onClick={onClose}
               className="btn btn-ghost flex-1"
@@ -233,19 +282,23 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
               Cancel
             </button>
             <button
-              onClick={handleSchedule}
+              onClick={handleCreatePoll}
               className="btn btn-primary flex-1 gap-2"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !question.trim() ||
+                options.filter((opt) => opt.trim()).length < 2
+              }
             >
               {isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  Scheduling...
+                  Creating...
                 </>
               ) : (
                 <>
-                  <Send size={18} />
-                  Schedule
+                  <MessageSquarePlus size={18} />
+                  Create Poll
                 </>
               )}
             </button>
@@ -253,7 +306,7 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -278,9 +331,22 @@ const ScheduleMessageModal = ({ channel, onClose }) => {
         .animate-scaleIn {
           animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--p) / 0.3);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--p) / 0.5);
+        }
       `}</style>
     </>
   );
 };
 
-export default ScheduleMessageModal;
+export default CreatePollModal;

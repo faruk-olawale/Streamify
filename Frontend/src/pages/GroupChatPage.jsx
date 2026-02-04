@@ -57,6 +57,7 @@ import QuickActionsMenu from "../component/QuickActionsMenu";
 import CustomSendButton from "../component/CustomSendButton";
 import MediaGallery from "../component/MediaGallery";
 import SharedFiles from "../component/SharedFiles";
+import CustomMessage from "../component/CustomMessage";
 
 const GroupChatPage = ({ authUser }) => {
   const { groupId } = useParams();
@@ -742,20 +743,20 @@ case "files":
               <div className="flex-1 min-h-0 overflow-hidden relative">
                 <Chat client={client}>
                   {/* KEY: Use SendButton prop on Channel */}
-                  <Channel
-                    channel={channel}
-                    SendButton={(props) => (
-                      <CustomSendButton {...props} channel={channel} />
-                    )}
-                  >
-                    <Window>
-                      <ChannelHeader />
-                      <MessageList />
-                      <TypingIndicator />
-                      <MessageInput grow />
-                    </Window>
-                    <Thread />
-                  </Channel>
+                      <Channel
+                  channel={channel}
+                  Message={(props) => <CustomMessage {...props} authUser={authUser} />}
+                  SendButton={(props) => <CustomSendButton {...props} />}
+                >
+                  <Window>
+                    <ChannelHeader />
+                    <MessageList />
+                    <MessageInput grow audioRecordingEnabled />
+
+                  </Window>
+                  <Thread />
+                </Channel>
+
                 </Chat>
 
                 {/* Quick Actions Button */}

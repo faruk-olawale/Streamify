@@ -366,7 +366,7 @@ const QuickActionsMenu = ({ group, channel, onClose, userRole, authUser }) => {
       </div>
 
       {/* Styles */}
-      <style jsx>{`
+      <style>{`
         @keyframes slideUp {
           from {
             opacity: 0;
