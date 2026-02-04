@@ -742,22 +742,23 @@ case "files":
 
               <div className="flex-1 min-h-0 overflow-hidden relative">
                 <Chat client={client}>
-                  {/* KEY: Use SendButton prop on Channel */}
-                      <Channel
-                  channel={channel}
-                  Message={(props) => <CustomMessage {...props} authUser={authUser} />}
-                  SendButton={(props) => <CustomSendButton {...props} />}
-                >
-                  <Window>
-                    <ChannelHeader />
-                    <MessageList />
-                    <MessageInput grow audioRecordingEnabled />
+  <Channel
+    channel={channel}
+    Message={(props) => <CustomMessage {...props} authUser={authUser} />}
+  >
+    <Window>
+      <ChannelHeader />
+      <MessageList />
+      <MessageInput
+        grow
+        audioRecordingEnabled
+        SendButton={CustomSendButton}
+      />
+    </Window>
+    <Thread />
+  </Channel>
+</Chat>
 
-                  </Window>
-                  <Thread />
-                </Channel>
-
-                </Chat>
 
                 {/* Quick Actions Button */}
                 <div className="absolute bottom-24 right-6 z-10">

@@ -1,4 +1,4 @@
-// import { Mic, Send } from "lucide-react";
+import { Mic, Send } from "lucide-react";
 import { useMessageInputContext } from "stream-chat-react";
 
 const CustomSendButton = () => {
@@ -18,17 +18,13 @@ const CustomSendButton = () => {
       disabled={disabled}
       onClick={(e) => {
         e.preventDefault();
-
-        if (hasText) {
-          handleSubmit(e);
-        } else if (audioRecordingEnabled) {
-          toggleAudioRecording();
-        }
+        if (hasText) handleSubmit(e);
+        else if (audioRecordingEnabled) toggleAudioRecording();
       }}
       className="custom-send-button"
       aria-label={hasText ? "Send message" : "Record voice message"}
     >
-      {/* {hasText ? <Send size={20} /> : <Mic size={20} />} */}
+      {hasText ? <Send size={20} /> : <Mic size={20} />}
     </button>
   );
 };
