@@ -29,6 +29,8 @@ const CustomMessage = ({ authUser }) => {
           pollData={pollData}
           messageId={message.id}
           currentUserId={authUser?._id}
+          currentUserName={authUser?.fullName || authUser?.name || 'User'}
+          currentUserImage={authUser?.profilePic || authUser?.image}
           channel={message.channel}
         />
       </div>

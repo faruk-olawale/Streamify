@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { CheckCircle2, Users, Clock, BarChart3, TrendingUp } from "lucide-react";
 import toast from "react-hot-toast";
 
-const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
+const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, currentUserImage, channel }) => {
   const [selectedOptions, setSelectedOptions] = useState(new Set());
   const [hasVoted, setHasVoted] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
@@ -14,7 +14,7 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
     return typeof pollData === 'string' ? JSON.parse(pollData) : pollData;
   }, [pollData]);
 
-  // Initialize poll state only once
+  // Initialize poll state and set up real-time listeners
   useEffect(() => {
     if (!parsedPoll) return;
     
@@ -32,7 +32,34 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
         console.error('Error loading vote:', error);
       }
     }
-  }, [parsedPoll, messageId, currentUserId]);
+
+    // Set up real-time listener for poll updates
+    if (!channel) return;
+
+    const handleMessageUpdate = (event) => {
+      // Check if this is an update to our poll message
+      if (event.message?.id === messageId) {
+        const updatedPollData = event.message.attachments?.find(
+          att => att.type === 'poll' || att.poll_data
+        )?.poll_data;
+
+        if (updatedPollData) {
+          const parsed = typeof updatedPollData === 'string' 
+            ? JSON.parse(updatedPollData) 
+            : updatedPollData;
+          setPollState(parsed);
+        }
+      }
+    };
+
+    // Listen for message updates
+    channel.on('message.updated', handleMessageUpdate);
+
+    // Cleanup
+    return () => {
+      channel.off('message.updated', handleMessageUpdate);
+    };
+  }, [parsedPoll, messageId, currentUserId, channel]);
 
   if (!pollState) return null;
 
@@ -67,7 +94,7 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
     }
   };
 
-  // Submit vote
+  // Submit vote with real-time update
   const handleVote = async () => {
     if (selectedOptions.size === 0) {
       toast.error("Please select at least one option");
@@ -76,28 +103,80 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
 
     setIsVoting(true);
     try {
-      // Update local state
+      // Use passed user info or fallback to channel state
+      let userName = currentUserName || 'User';
+      let userImage = currentUserImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
+
+      // If no user info passed, try to get from channel
+      if (!currentUserName || !currentUserImage) {
+        try {
+          const member = channel?.state?.members?.[currentUserId];
+          if (member) {
+            userName = member.user?.name || member.user?.id || userName;
+            userImage = member.user?.image || userImage;
+          }
+        } catch (err) {
+          console.log('Using fallback user info');
+        }
+      }
+
+      // Create voter info
+      const voterInfo = {
+        userId: currentUserId,
+        userName: userName,
+        userImage: userImage,
+        votedAt: new Date().toISOString()
+      };
+
+      // Update poll state with new vote
       const updatedOptions = options.map(opt => {
         if (selectedOptions.has(opt.id)) {
           return {
             ...opt,
             votes: (opt.votes || 0) + 1,
-            voters: [...(opt.voters || []), currentUserId]
+            voters: [...(opt.voters || []), voterInfo]
           };
         }
         return opt;
       });
 
-      setPollState({
+      const updatedPollState = {
         ...pollState,
-        options: updatedOptions
-      });
+        options: updatedOptions,
+        totalVotes: actualTotalVotes + selectedOptions.size
+      };
+
+      // Update local state immediately for instant feedback
+      setPollState(updatedPollState);
+      setHasVoted(true);
 
       // Save vote locally
       const voteKey = `poll_${messageId}_${currentUserId}`;
       localStorage.setItem(voteKey, JSON.stringify(Array.from(selectedOptions)));
 
-      setHasVoted(true);
+      // Update the message in Stream Chat for real-time sync
+      try {
+        const message = await channel.getMessage(messageId);
+        const updatedAttachments = message.message.attachments.map(att => {
+          if (att.type === 'poll' || att.poll_data) {
+            return {
+              ...att,
+              poll_data: JSON.stringify(updatedPollState)
+            };
+          }
+          return att;
+        });
+
+        await channel.updateMessage({
+          id: messageId,
+          text: message.message.text,
+          attachments: updatedAttachments
+        });
+      } catch (error) {
+        console.error('Failed to sync poll update:', error);
+        // Vote still works locally even if sync fails
+      }
+
       toast.success("Vote submitted! 🎉");
     } catch (error) {
       console.error("Vote error:", error);
@@ -163,86 +242,130 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
               const percentage = getPercentage(option.votes || 0);
               const showResults = hasVoted;
               const isWinning = hasVoted && option.votes === maxVotes && maxVotes > 0;
+              const voters = option.voters || [];
 
               return (
-                <button
-                  key={option.id}
-                  onClick={() => handleOptionClick(option.id)}
-                  disabled={hasVoted || isVoting}
-                  className={`poll-option-btn relative w-full text-left transition-all duration-300 group ${
-                    hasVoted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'
-                  }`}
-                >
-                  <div
-                    className={`poll-option-content relative rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
-                      isSelected && !hasVoted
-                        ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]'
-                        : hasVoted
-                        ? isWinning 
-                          ? 'border-success/30 bg-base-100 shadow-md'
-                          : 'border-base-300/40 bg-base-100'
-                        : 'border-base-300/40 bg-base-100 hover:border-primary/40 hover:bg-base-50 hover:shadow-md hover:scale-[1.01]'
+                <div key={option.id} className="poll-option-wrapper">
+                  <button
+                    onClick={() => handleOptionClick(option.id)}
+                    disabled={hasVoted || isVoting}
+                    className={`poll-option-btn relative w-full text-left transition-all duration-300 group ${
+                      hasVoted ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'
                     }`}
                   >
-                    {/* Progress Bar Background */}
-                    {showResults && (
-                      <div
-                        className={`poll-progress absolute inset-0 transition-all duration-700 ease-out ${
-                          isWinning 
-                            ? 'bg-gradient-to-r from-success/20 via-success/15 to-success/5'
-                            : 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    )}
-
-                    {/* Option Content */}
-                    <div className="relative z-10 p-4 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {/* Radio/Checkbox */}
-                        <div
-                          className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                            isSelected && !hasVoted
-                              ? 'border-primary bg-primary shadow-sm shadow-primary/30'
-                              : hasVoted && selectedOptions.has(option.id)
-                              ? 'border-primary bg-primary'
-                              : 'border-base-300 bg-base-100 group-hover:border-primary/50'
-                          }`}
-                        >
-                          {(isSelected || (hasVoted && selectedOptions.has(option.id))) && (
-                            <div className="w-2 h-2 rounded-full bg-white"></div>
-                          )}
-                        </div>
-
-                        {/* Option Text */}
-                        <span className={`font-medium text-sm flex-1 truncate transition-colors ${
-                          showResults && isWinning ? 'text-success font-semibold' : 'text-base-content'
-                        }`}>
-                          {option.text}
-                        </span>
-                      </div>
-
-                      {/* Vote Count/Percentage */}
+                    <div
+                      className={`poll-option-content relative rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
+                        isSelected && !hasVoted
+                          ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]'
+                          : hasVoted
+                          ? isWinning 
+                            ? 'border-success/30 bg-base-100 shadow-md'
+                            : 'border-base-300/40 bg-base-100'
+                          : 'border-base-300/40 bg-base-100 hover:border-primary/40 hover:bg-base-50 hover:shadow-md hover:scale-[1.01]'
+                      }`}
+                    >
+                      {/* Progress Bar Background */}
                       {showResults && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {isWinning && (
-                            <TrendingUp size={14} className="text-success" />
-                          )}
-                          <span className={`text-sm font-bold ${
-                            isWinning ? 'text-success' : 'text-primary'
-                          }`}>
-                            {percentage}%
-                          </span>
-                          {!isAnonymous && option.votes > 0 && (
-                            <span className="text-xs text-base-content/60 font-medium">
-                              ({option.votes})
-                            </span>
-                          )}
-                        </div>
+                        <div
+                          className={`poll-progress absolute inset-0 transition-all duration-700 ease-out ${
+                            isWinning 
+                              ? 'bg-gradient-to-r from-success/20 via-success/15 to-success/5'
+                              : 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent'
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
                       )}
+
+                      {/* Option Content */}
+                      <div className="relative z-10 p-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Radio/Checkbox */}
+                          <div
+                            className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                              isSelected && !hasVoted
+                                ? 'border-primary bg-primary shadow-sm shadow-primary/30'
+                                : hasVoted && selectedOptions.has(option.id)
+                                ? 'border-primary bg-primary'
+                                : 'border-base-300 bg-base-100 group-hover:border-primary/50'
+                            }`}
+                          >
+                            {(isSelected || (hasVoted && selectedOptions.has(option.id))) && (
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                            )}
+                          </div>
+
+                          {/* Option Text */}
+                          <span className={`font-medium text-sm flex-1 truncate transition-colors ${
+                            showResults && isWinning ? 'text-success font-semibold' : 'text-base-content'
+                          }`}>
+                            {option.text}
+                          </span>
+                        </div>
+
+                        {/* Vote Count/Percentage */}
+                        {showResults && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isWinning && (
+                              <TrendingUp size={14} className="text-success" />
+                            )}
+                            <span className={`text-sm font-bold ${
+                              isWinning ? 'text-success' : 'text-primary'
+                            }`}>
+                              {percentage}%
+                            </span>
+                            {!isAnonymous && option.votes > 0 && (
+                              <span className="text-xs text-base-content/60 font-medium">
+                                ({option.votes})
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+
+                  {/* Voter Avatars (shown after voting and if not anonymous) */}
+                  {showResults && !isAnonymous && voters.length > 0 && (
+                    <div className="mt-2 ml-12 flex items-center gap-2 animate-fadeIn">
+                      <div className="flex -space-x-2">
+                        {voters.slice(0, 5).map((voter, idx) => (
+                          <div
+                            key={voter.userId || idx}
+                            className="avatar"
+                            title={voter.userName}
+                          >
+                            <div className="w-6 h-6 rounded-full ring-2 ring-base-100 bg-base-200 overflow-hidden">
+                              <img
+                                src={voter.userImage}
+                                alt={voter.userName}
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    voter.userName
+                                  )}&size=32&background=random`;
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {voters.length > 5 && (
+                          <div className="w-6 h-6 rounded-full ring-2 ring-base-100 bg-base-300 flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-base-content">
+                              +{voters.length - 5}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-base-content/60">
+                        {voters.length === 1 
+                          ? voters[0].userName
+                          : voters.length === 2
+                          ? `${voters[0].userName} and ${voters[1].userName}`
+                          : `${voters[0].userName} and ${voters.length - 1} others`
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -296,7 +419,7 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
         </div>
       </div>
 
-      {/* Regular CSS instead of styled-jsx */}
+      {/* Animations */}
       <style>{`
         .poll-message-container {
           animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -304,6 +427,10 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
 
         .poll-progress {
           animation: fillProgress 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
         }
 
         @keyframes slideIn {
@@ -323,8 +450,27 @@ const PollMessage = ({ pollData, messageId, currentUserId, channel }) => {
           }
         }
 
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
         .poll-option-btn:not(:disabled):active {
           transform: scale(0.98);
+        }
+
+        /* Avatar hover effects */
+        .avatar {
+          transition: transform 0.2s ease;
+        }
+
+        .avatar:hover {
+          transform: scale(1.2);
+          z-index: 10;
         }
       `}</style>
     </>
