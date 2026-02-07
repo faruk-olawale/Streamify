@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { X, Plus, Trash2, MessageSquarePlus, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { createPollInDB } from "../lib/api";
 
-const CreatePollModal = ({ channel, onClose }) => {
+const CreatePollModal = ({ channel, onClose, group, authUser }) => {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [allowMultiple, setAllowMultiple] = useState(false);
@@ -47,16 +48,6 @@ const CreatePollModal = ({ channel, onClose }) => {
     try {
       setIsSubmitting(true);
 
-      // Create poll display text
-      let pollText = `📊 **POLL:** ${question}\n\n`;
-      filledOptions.forEach((opt, idx) => {
-        pollText += `${idx + 1}️⃣ ${opt}\n`;
-      });
-      
-      pollText += `\n${allowMultiple ? "✅ Multiple choice" : "⭕ Single choice"}`;
-      pollText += ` • ${isAnonymous ? "🔒 Anonymous" : "👥 Public"}`;
-      pollText += `\n\n💬 Reply with the number of your choice!`;
-
       // Create poll data structure
       const pollData = {
         question: question.trim(),
@@ -74,8 +65,19 @@ const CreatePollModal = ({ channel, onClose }) => {
         totalVotes: 0,
       };
 
-      // Send poll as a regular message with custom attachment
-      await channel.sendMessage({
+      // Create poll display text
+      let pollText = `📊 **POLL:** ${question}\n\n`;
+      filledOptions.forEach((opt, idx) => {
+        pollText += `${idx + 1}️⃣ ${opt}\n`;
+      });
+      
+      pollText += `\n${allowMultiple ? "✅ Multiple choice" : "⭕ Single choice"}`;
+      pollText += ` • ${isAnonymous ? "🔒 Anonymous" : "👥 Public"}`;
+
+      console.log('🎯 Step 1: Sending poll to Stream Chat...');
+
+      // 1. Send poll message to Stream Chat
+      const streamResponse = await channel.sendMessage({
         text: pollText,
         attachments: [
           {
@@ -87,12 +89,49 @@ const CreatePollModal = ({ channel, onClose }) => {
         ],
       });
 
-      toast.success("Poll created successfully! 🎉");
-      onClose();
+      const messageId = streamResponse.message.id;
+      console.log('✅ Stream Chat message sent. MessageId:', messageId);
+
+      // 2. CRITICAL: Save poll to YOUR backend database
+      console.log('🎯 Step 2: Saving poll to database...');
+      console.log('Poll data being sent:', {
+        messageId,
+        channelId: channel.id,
+        question: question.trim(),
+        optionsCount: pollData.options.length
+      });
+
+      try {
+        const backendResponse = await createPollInDB({
+          messageId: messageId,
+          channelId: channel.id,
+          question: question.trim(),
+          options: pollData.options,
+          settings: pollData.settings
+        });
+
+        if (backendResponse.success) {
+          console.log('✅ Poll saved to database successfully!', backendResponse.poll);
+          toast.success("Poll created successfully! 🎉");
+          onClose();
+        } else {
+          throw new Error(backendResponse.error || 'Failed to save poll');
+        }
+      } catch (backendError) {
+        console.error('❌ Backend save error:', backendError);
+        console.error('Error details:', backendError.response?.data);
+        
+        // Show specific error to user
+        const errorMessage = backendError.response?.data?.error || backendError.message || 'Unknown error';
+        toast.error(`Poll NOT saved to database: ${errorMessage}`);
+        
+        // Don't close modal so user can try again
+        setIsSubmitting(false);
+        return;
+      }
     } catch (error) {
-      console.error("Poll creation error:", error);
+      console.error("❌ Poll creation error:", error);
       
-      // Better error messages
       if (error.message?.includes("StreamChat error")) {
         toast.error("Failed to send poll to chat. Please try again.");
       } else {

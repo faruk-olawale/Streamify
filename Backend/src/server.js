@@ -11,6 +11,7 @@ import groupRoutes from "./routes/group.route.js";
 import uploadRoutes from "./routes/upload.route.js";
 import matchingRoutes from "./routes/matching.route.js";
 import practiceRoutes from "./routes/practiceRoutes.js";
+import pollRoutes from "./routes/poll.route.js";
 import os from "os";
 
 
@@ -39,6 +40,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/matching", matchingRoutes);
 app.use("/api/practice", practiceRoutes);
+app.use("/api/polls", pollRoutes);
 
 // Log all registered routes
 console.log("=== REGISTERED ROUTES ===");

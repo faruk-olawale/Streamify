@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CheckCircle2, Users, Clock, BarChart3, TrendingUp } from "lucide-react";
 import toast from "react-hot-toast";
+import { getPoll, submitPollVote } from "../lib/api"; // Use your existing API
 
 const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, currentUserImage, channel }) => {
   const [selectedOptions, setSelectedOptions] = useState(new Set());
@@ -8,65 +9,75 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
   const [isVoting, setIsVoting] = useState(false);
   const [pollState, setPollState] = useState(null);
 
-  // Parse and memoize poll data to prevent infinite loops
+  // Parse and memoize poll data
   const parsedPoll = useMemo(() => {
     if (!pollData) return null;
     return typeof pollData === 'string' ? JSON.parse(pollData) : pollData;
   }, [pollData]);
 
-  // Initialize poll state and set up real-time listeners
+  // Initialize and load poll data
   useEffect(() => {
     if (!parsedPoll) return;
     
-    setPollState(parsedPoll);
-    
-    // Check if current user has already voted
-    const voteKey = `poll_${messageId}_${currentUserId}`;
-    const existingVote = localStorage.getItem(voteKey);
-    if (existingVote) {
+    // Load latest poll data from YOUR backend using your API
+    const loadPollData = async () => {
       try {
-        const voted = JSON.parse(existingVote);
-        setSelectedOptions(new Set(voted));
-        setHasVoted(true);
+        const { poll } = await getPoll(messageId);
+        
+        console.log('✅ Loaded poll from database:', poll);
+        
+        setPollState({
+          question: poll.question,
+          options: poll.options,
+          settings: poll.settings,
+          createdAt: poll.createdAt,
+          totalVotes: poll.totalVotes || poll.options.reduce((sum, opt) => sum + opt.votes, 0)
+        });
+        
+        // Check if current user has voted
+        const userVoted = poll.options.some(opt => 
+          opt.voters.some(v => 
+            v.userId === currentUserId || 
+            v.userId?.toString() === currentUserId?.toString()
+          )
+        );
+        
+        if (userVoted) {
+          setHasVoted(true);
+          const votedIds = poll.options
+            .filter(opt => opt.voters.some(v => 
+              v.userId === currentUserId || 
+              v.userId?.toString() === currentUserId?.toString()
+            ))
+            .map(opt => opt.id);
+          setSelectedOptions(new Set(votedIds));
+        }
       } catch (error) {
-        console.error('Error loading vote:', error);
+        console.log('Backend not available, using message data:', error);
+        setPollState(parsedPoll);
       }
-    }
+    };
 
-    // Set up real-time listener for poll updates
+    loadPollData();
+
+    // Real-time listener for updates
     if (!channel) return;
 
     const handleMessageUpdate = (event) => {
-      // Check if this is an update to our poll message
       if (event.message?.id === messageId) {
-        const updatedPollData = event.message.attachments?.find(
-          att => att.type === 'poll' || att.poll_data
-        )?.poll_data;
-
-        if (updatedPollData) {
-          const parsed = typeof updatedPollData === 'string' 
-            ? JSON.parse(updatedPollData) 
-            : updatedPollData;
-          setPollState(parsed);
-        }
+        // Reload from backend when message updates
+        loadPollData();
       }
     };
 
-    // Listen for message updates
     channel.on('message.updated', handleMessageUpdate);
-
-    // Cleanup
-    return () => {
-      channel.off('message.updated', handleMessageUpdate);
-    };
+    return () => channel.off('message.updated', handleMessageUpdate);
   }, [parsedPoll, messageId, currentUserId, channel]);
 
   if (!pollState) return null;
 
   const { question, options, settings, createdAt } = pollState;
   const { allowMultiple, isAnonymous } = settings || {};
-
-  // Calculate total votes and percentages
   const actualTotalVotes = options.reduce((sum, opt) => sum + (opt.votes || 0), 0);
   
   const getPercentage = (votes) => {
@@ -74,10 +85,8 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
     return Math.round((votes / actualTotalVotes) * 100);
   };
 
-  // Get max voted option for highlighting
   const maxVotes = Math.max(...options.map(opt => opt.votes || 0));
 
-  // Handle option selection
   const handleOptionClick = (optionId) => {
     if (hasVoted) return;
     
@@ -94,7 +103,6 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
     }
   };
 
-  // Submit vote with real-time update
   const handleVote = async () => {
     if (selectedOptions.size === 0) {
       toast.error("Please select at least one option");
@@ -103,84 +111,25 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
 
     setIsVoting(true);
     try {
-      // Use passed user info or fallback to channel state
-      let userName = currentUserName || 'User';
-      let userImage = currentUserImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
+      // Call YOUR backend API using your existing API pattern
+      const { poll } = await submitPollVote(messageId, Array.from(selectedOptions));
 
-      // If no user info passed, try to get from channel
-      if (!currentUserName || !currentUserImage) {
-        try {
-          const member = channel?.state?.members?.[currentUserId];
-          if (member) {
-            userName = member.user?.name || member.user?.id || userName;
-            userImage = member.user?.image || userImage;
-          }
-        } catch (err) {
-          console.log('Using fallback user info');
-        }
-      }
-
-      // Create voter info
-      const voterInfo = {
-        userId: currentUserId,
-        userName: userName,
-        userImage: userImage,
-        votedAt: new Date().toISOString()
-      };
-
-      // Update poll state with new vote
-      const updatedOptions = options.map(opt => {
-        if (selectedOptions.has(opt.id)) {
-          return {
-            ...opt,
-            votes: (opt.votes || 0) + 1,
-            voters: [...(opt.voters || []), voterInfo]
-          };
-        }
-        return opt;
+      // Update local state with backend response
+      setPollState({
+        question: poll.question,
+        options: poll.options,
+        settings: poll.settings,
+        createdAt: poll.createdAt || poll.timestamps?.createdAt,
+        totalVotes: poll.totalVotes || poll.options.reduce((sum, opt) => sum + opt.votes, 0)
       });
-
-      const updatedPollState = {
-        ...pollState,
-        options: updatedOptions,
-        totalVotes: actualTotalVotes + selectedOptions.size
-      };
-
-      // Update local state immediately for instant feedback
-      setPollState(updatedPollState);
+      
       setHasVoted(true);
 
-      // Save vote locally
-      const voteKey = `poll_${messageId}_${currentUserId}`;
-      localStorage.setItem(voteKey, JSON.stringify(Array.from(selectedOptions)));
-
-      // Update the message in Stream Chat for real-time sync
-      try {
-        const message = await channel.getMessage(messageId);
-        const updatedAttachments = message.message.attachments.map(att => {
-          if (att.type === 'poll' || att.poll_data) {
-            return {
-              ...att,
-              poll_data: JSON.stringify(updatedPollState)
-            };
-          }
-          return att;
-        });
-
-        await channel.updateMessage({
-          id: messageId,
-          text: message.message.text,
-          attachments: updatedAttachments
-        });
-      } catch (error) {
-        console.error('Failed to sync poll update:', error);
-        // Vote still works locally even if sync fails
-      }
-
+      console.log('✅ Vote saved to database');
       toast.success("Vote submitted! 🎉");
     } catch (error) {
       console.error("Vote error:", error);
-      toast.error("Failed to submit vote");
+      toast.error(error.response?.data?.error || error.message || "Failed to submit vote");
     } finally {
       setIsVoting(false);
     }
@@ -240,8 +189,8 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
             {options.map((option) => {
               const isSelected = selectedOptions.has(option.id);
               const percentage = getPercentage(option.votes || 0);
-              const showResults = hasVoted;
-              const isWinning = hasVoted && option.votes === maxVotes && maxVotes > 0;
+              const showResults = hasVoted || actualTotalVotes > 0;
+              const isWinning = showResults && option.votes === maxVotes && maxVotes > 0;
               const voters = option.voters || [];
 
               return (
@@ -257,14 +206,14 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                       className={`poll-option-content relative rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                         isSelected && !hasVoted
                           ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]'
-                          : hasVoted
+                          : hasVoted || showResults
                           ? isWinning 
                             ? 'border-success/30 bg-base-100 shadow-md'
                             : 'border-base-300/40 bg-base-100'
                           : 'border-base-300/40 bg-base-100 hover:border-primary/40 hover:bg-base-50 hover:shadow-md hover:scale-[1.01]'
                       }`}
                     >
-                      {/* Progress Bar Background */}
+                      {/* Progress Bar */}
                       {showResults && (
                         <div
                           className={`poll-progress absolute inset-0 transition-all duration-700 ease-out ${
@@ -279,7 +228,6 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                       {/* Option Content */}
                       <div className="relative z-10 p-4 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {/* Radio/Checkbox */}
                           <div
                             className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                               isSelected && !hasVoted
@@ -294,7 +242,6 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                             )}
                           </div>
 
-                          {/* Option Text */}
                           <span className={`font-medium text-sm flex-1 truncate transition-colors ${
                             showResults && isWinning ? 'text-success font-semibold' : 'text-base-content'
                           }`}>
@@ -302,15 +249,10 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                           </span>
                         </div>
 
-                        {/* Vote Count/Percentage */}
                         {showResults && (
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {isWinning && (
-                              <TrendingUp size={14} className="text-success" />
-                            )}
-                            <span className={`text-sm font-bold ${
-                              isWinning ? 'text-success' : 'text-primary'
-                            }`}>
+                            {isWinning && <TrendingUp size={14} className="text-success" />}
+                            <span className={`text-sm font-bold ${isWinning ? 'text-success' : 'text-primary'}`}>
                               {percentage}%
                             </span>
                             {!isAnonymous && option.votes > 0 && (
@@ -324,24 +266,18 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                     </div>
                   </button>
 
-                  {/* Voter Avatars (shown after voting and if not anonymous) */}
+                  {/* Voter Avatars */}
                   {showResults && !isAnonymous && voters.length > 0 && (
                     <div className="mt-2 ml-12 flex items-center gap-2 animate-fadeIn">
                       <div className="flex -space-x-2">
                         {voters.slice(0, 5).map((voter, idx) => (
-                          <div
-                            key={voter.userId || idx}
-                            className="avatar"
-                            title={voter.userName}
-                          >
+                          <div key={voter.userId || idx} className="avatar" title={voter.userName}>
                             <div className="w-6 h-6 rounded-full ring-2 ring-base-100 bg-base-200 overflow-hidden">
                               <img
                                 src={voter.userImage}
                                 alt={voter.userName}
                                 onError={(e) => {
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                    voter.userName
-                                  )}&size=32&background=random`;
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(voter.userName)}&size=32&background=random`;
                                 }}
                               />
                             </div>
@@ -370,16 +306,14 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
             })}
           </div>
 
-          {/* Vote Button or Results Footer */}
+          {/* Vote Button or Results */}
           <div className="poll-footer px-5 pb-5">
             {!hasVoted ? (
               <button
                 onClick={handleVote}
                 disabled={selectedOptions.size === 0 || isVoting}
                 className={`btn w-full shadow-lg hover:shadow-xl transition-all gap-2 ${
-                  selectedOptions.size > 0 
-                    ? 'btn-primary' 
-                    : 'btn-disabled opacity-50'
+                  selectedOptions.size > 0 ? 'btn-primary' : 'btn-disabled opacity-50'
                 }`}
               >
                 {isVoting ? (
@@ -404,12 +338,8 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
                 <div className="flex items-center justify-center gap-2 text-success">
                   <CheckCircle2 size={18} />
                   <span className="font-semibold text-sm">
-                    Your vote: {" "}
-                    <span className="text-base-content">
-                      {options
-                        .filter(opt => selectedOptions.has(opt.id))
-                        .map(opt => opt.text)
-                        .join(", ")}
+                    Your vote: <span className="text-base-content">
+                      {options.filter(opt => selectedOptions.has(opt.id)).map(opt => opt.text).join(", ")}
                     </span>
                   </span>
                 </div>
@@ -419,55 +349,33 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
         </div>
       </div>
 
-      {/* Animations */}
       <style>{`
         .poll-message-container {
           animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
-
         .poll-progress {
           animation: fillProgress 0.7s cubic-bezier(0.16, 1, 0.3, 1);
         }
-
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
         }
-
         @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes fillProgress {
-          from {
-            width: 0;
-          }
+          from { width: 0; }
         }
-
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-
         .poll-option-btn:not(:disabled):active {
           transform: scale(0.98);
         }
-
-        /* Avatar hover effects */
         .avatar {
           transition: transform 0.2s ease;
         }
-
         .avatar:hover {
           transform: scale(1.2);
           z-index: 10;

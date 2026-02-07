@@ -231,7 +231,51 @@ export const getGroupActivity = async (groupId, limit = 20, offset = 0) => {
 };
 
 // ============================================
-// GROUP CHAT API - QUICK ACTIONS
+// POLL API (NEW!)
+// ============================================
+
+// Create a new poll
+export const createPollInDB = async (pollData) => {
+  const response = await axiosInstance.post("/polls", pollData);
+  return response.data;
+};
+
+// Get a specific poll
+export const getPoll = async (messageId) => {
+  const response = await axiosInstance.get(`/polls/${messageId}`);
+  return response.data;
+};
+
+// Submit a vote
+export const submitPollVote = async (messageId, optionIds) => {
+  const response = await axiosInstance.post(`/polls/${messageId}/vote`, {
+    optionIds
+  });
+  return response.data;
+};
+
+// Get poll results
+export const getPollResults = async (messageId) => {
+  const response = await axiosInstance.get(`/polls/${messageId}/results`);
+  return response.data;
+};
+
+// Close a poll (admin/creator only)
+export const closePoll = async (messageId) => {
+  const response = await axiosInstance.patch(`/polls/${messageId}/close`);
+  return response.data;
+};
+
+// Get all polls in a group
+export const getGroupPolls = async (groupId, page = 1, limit = 10) => {
+  const response = await axiosInstance.get(
+    `/polls/group/${groupId}?page=${page}&limit=${limit}`
+  );
+  return response.data;
+};
+
+// ============================================
+// GROUP CHAT API - QUICK ACTIONS (OLD)
 // ============================================
 
 export const scheduleVideoSession = async (groupId, sessionData) => {
@@ -242,6 +286,7 @@ export const scheduleVideoSession = async (groupId, sessionData) => {
   return response.data;
 };
 
+// Old poll API (keep for backwards compatibility if needed)
 export const createPoll = async (groupId, pollData) => {
   const response = await axiosInstance.post(
     `/groups/${groupId}/polls`,
