@@ -349,7 +349,7 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
         </div>
       </div>
 
-      <style>{`
+      {/* <style>{`
         .poll-message-container {
           animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -380,7 +380,7 @@ const PollMessage = ({ pollData, messageId, currentUserId, currentUserName, curr
           transform: scale(1.2);
           z-index: 10;
         }
-      `}</style>
+      `}</style> */}
     </>
   );
 };

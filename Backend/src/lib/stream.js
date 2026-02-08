@@ -11,12 +11,17 @@ if (!apiKey || !apiSecret) {
 const streamClient = StreamChat.getInstance(apiKey, apiSecret);
 
 export const upsertStreamUser = async (userData) => {
-    try {
-        await streamClient.upsertUsers([userData]);
-        return userData;
-    } catch (error) {
-        console.log("Error upserting stream user:", error);
-    }
+  try {
+    await streamClient.upsertUser({
+      id: userData.id,
+      name: userData.name,
+      image: userData.image,
+      role: 'admin' // ← Change to admin for full permissions
+    });
+  } catch (error) {
+    console.error('Error upserting Stream user:', error);
+    throw error;
+  }
 };
 
 export const generateStreamToken = (userId) => {
