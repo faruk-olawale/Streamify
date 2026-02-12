@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
+// AI Components - NEW
+import AIChatbot from '../component/AIChatbot';
+
 const MessagesPage = () => {
   const navigate = useNavigate();
   const { authUser } = useAuthUser();
@@ -368,6 +371,12 @@ const MessagesPage = () => {
           </div>
         )}
       </div>
+
+      {/* AI Chatbot - Floating Button (Like WhatsApp Meta AI) - NEW */}
+      <AIChatbot
+        targetLanguage={authUser?.learningLanguages?.[0] || 'English'}
+        userLevel={authUser?.languageLevel || 'beginner'}
+      />
     </div>
   );
 };

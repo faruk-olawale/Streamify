@@ -12,6 +12,7 @@ import uploadRoutes from "./routes/upload.route.js";
 import matchingRoutes from "./routes/matching.route.js";
 import practiceRoutes from "./routes/practiceRoutes.js";
 import pollRoutes from "./routes/poll.route.js";
+import aiRoutes from './routes/ai.route.js';
 import os from "os";
 
 
@@ -41,6 +42,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/matching", matchingRoutes);
 app.use("/api/practice", practiceRoutes);
 app.use("/api/polls", pollRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Log all registered routes
 console.log("=== REGISTERED ROUTES ===");
@@ -73,6 +75,7 @@ app.get("/api/server-ip", (req, res) => {
 
   res.json({ ip: lanIp, port: process.env.PORT || 5001 });
 });
+console.log('🔑 Groq API Key:', process.env.GROQ_API_KEY ? 'Loaded ✅' : 'Missing ❌');
 
 
 app.listen(PORT, () => {
