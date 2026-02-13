@@ -20,7 +20,7 @@ import FindPartnersPage from "./pages/FindPartnersPage";
 import PracticePage from "./pages/PracticePage.jsx";
 import FriendsPage from "./pages/FriendsPage.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
-// import AIChatPage from './pages/AIChatPage.jsx';
+import AIChatPage from './component/AIChatPage.jsx';
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -165,7 +165,7 @@ const App = () => {
         <Route path="/practice" element={<PracticePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
-        {/* <Route path="/ai-chat" element={<AIChatPage />} /> */}
+        <Route path="/ai-chat" element={<AIChatPage />} />
       </Routes>
     </div>
   );
