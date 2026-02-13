@@ -18,8 +18,9 @@ import GroupChatPage from "./pages/GroupChatPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import FindPartnersPage from "./pages/FindPartnersPage";
 import PracticePage from "./pages/PracticePage.jsx";
-import FriendsPage from "./pages/FriendsPage";
-import MessagesPage from "./pages/MessagesPage";
+import FriendsPage from "./pages/FriendsPage.jsx";
+import MessagesPage from "./pages/MessagesPage.jsx";
+// import AIChatPage from './pages/AIChatPage.jsx';
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -164,6 +165,7 @@ const App = () => {
         <Route path="/practice" element={<PracticePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
+        {/* <Route path="/ai-chat" element={<AIChatPage />} /> */}
       </Routes>
     </div>
   );

@@ -12,6 +12,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 
 // AI Components - NEW
+import AIChatListItem from '../component/AIChatListItem';
 import AIChatbot from '../component/AIChatbot';
 
 const MessagesPage = () => {
@@ -20,7 +21,7 @@ const MessagesPage = () => {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all"); // all, unread, favorites
+  const [filterType, setFilterType] = useState("all");
   const [selectedChannels, setSelectedChannels] = useState(new Set());
   const [showActions, setShowActions] = useState(false);
   
@@ -35,13 +36,11 @@ const MessagesPage = () => {
     queryFn: getUserFriends,
   });
 
-  // Use the global Stream client hook
   const { client: chatClient, isConnecting } = useStreamClient(
     authUser,
     tokenData?.token
   );
 
-  // Load channels when client is ready
   useEffect(() => {
     if (!chatClient || !authUser) return;
 
@@ -74,7 +73,6 @@ const MessagesPage = () => {
 
     loadChannels();
 
-    // Listen for new messages to update channel list
     const handleNewMessage = (event) => {
       if (event.channel_id && isMounted) {
         loadChannels();
@@ -89,7 +87,6 @@ const MessagesPage = () => {
     };
   }, [chatClient, authUser]);
 
-  // Reload channels helper
   const reloadChannels = async () => {
     if (!chatClient || !authUser) return;
 
@@ -107,37 +104,31 @@ const MessagesPage = () => {
     setChannels(channelList);
   };
 
-  // Get friend info from channel
   const getFriendFromChannel = (channel) => {
     const members = Object.values(channel.state.members || {});
     const friend = members.find(m => m.user?.id !== authUser._id);
     return friend?.user || null;
   };
 
-  // Get last message
   const getLastMessage = (channel) => {
     const messages = channel.state.messages || [];
     return messages[messages.length - 1];
   };
 
-  // Get unread count
   const getUnreadCount = (channel) => {
     return channel.countUnread() || 0;
   };
 
-  // Filter channels
   const filteredChannels = channels.filter(channel => {
     const friend = getFriendFromChannel(channel);
     const lastMessage = getLastMessage(channel);
     
-    // Search filter
     if (searchQuery) {
       const nameMatch = friend?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       const messageMatch = lastMessage?.text?.toLowerCase().includes(searchQuery.toLowerCase());
       if (!nameMatch && !messageMatch) return false;
     }
 
-    // Type filter
     if (filterType === "unread") {
       return getUnreadCount(channel) > 0;
     }
@@ -145,7 +136,6 @@ const MessagesPage = () => {
     return true;
   });
 
-  // Handle channel click
   const handleChannelClick = (channel) => {
     const members = Object.keys(channel.state.members || {});
     const friendId = members.find(id => id !== authUser._id);
@@ -155,7 +145,6 @@ const MessagesPage = () => {
     }
   };
 
-  // Toggle channel selection
   const toggleChannelSelection = (channelId) => {
     const newSelected = new Set(selectedChannels);
     if (newSelected.has(channelId)) {
@@ -167,7 +156,6 @@ const MessagesPage = () => {
     setShowActions(newSelected.size > 0);
   };
 
-  // Bulk delete
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedChannels.size} conversation(s)?`)) return;
     
@@ -187,7 +175,6 @@ const MessagesPage = () => {
     }
   };
 
-  // Mark all as read
   const handleMarkAllRead = async () => {
     try {
       for (const channelId of selectedChannels) {
@@ -205,7 +192,6 @@ const MessagesPage = () => {
     }
   };
 
-  // Show loading state
   if (isConnecting || loading) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-base-100">
@@ -239,9 +225,7 @@ const MessagesPage = () => {
             </button>
           </div>
 
-          {/* Search & Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-base-content/40" />
               <input
@@ -261,7 +245,6 @@ const MessagesPage = () => {
               )}
             </div>
 
-            {/* Filter Buttons */}
             <div className="flex gap-2">
               <button
                 onClick={() => setFilterType("all")}
@@ -280,7 +263,6 @@ const MessagesPage = () => {
         </div>
       </div>
 
-      {/* Bulk Actions Bar */}
       {showActions && (
         <div className="bg-primary text-primary-content px-4 py-3 flex items-center justify-between animate-in slide-in-from-top">
           <div className="flex items-center gap-3">
@@ -319,35 +301,39 @@ const MessagesPage = () => {
 
       {/* Messages List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredChannels.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full px-4">
-            <MessageCircle className="size-16 text-base-content/30 mb-4" />
-            <h3 className="text-xl font-bold mb-2">
-              {searchQuery ? 'No conversations found' : 'No messages yet'}
-            </h3>
-            <p className="text-base-content/70 text-center mb-4 max-w-md">
-              {searchQuery 
-                ? 'Try a different search term'
-                : 'Start a conversation with your language partners'
-              }
-            </p>
-            {searchQuery ? (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="btn btn-primary btn-sm"
-              >
-                Clear Search
-              </button>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="space-y-2">
+            {/* AI Chat Item - Always at the top - NEW */}
+            {!searchQuery && <AIChatListItem authUser={authUser} />}
+
+            {/* Regular Conversations */}
+            {filteredChannels.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <MessageCircle className="size-16 text-base-content/30 mb-4" />
+                <h3 className="text-xl font-bold mb-2">
+                  {searchQuery ? 'No conversations found' : 'No messages yet'}
+                </h3>
+                <p className="text-base-content/70 text-center mb-4 max-w-md">
+                  {searchQuery 
+                    ? 'Try a different search term'
+                    : 'Start a conversation with your language partners'
+                  }
+                </p>
+                {searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Clear Search
+                  </button>
+                ) : (
+                  <Link to="/find-partners" className="btn btn-primary">
+                    Find Language Partners
+                  </Link>
+                )}
+              </div>
             ) : (
-              <Link to="/find-partners" className="btn btn-primary">
-                Find Language Partners
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="space-y-2">
-              {filteredChannels.map((channel) => {
+              filteredChannels.map((channel) => {
                 const friend = getFriendFromChannel(channel);
                 const lastMessage = getLastMessage(channel);
                 const unreadCount = getUnreadCount(channel);
@@ -366,13 +352,13 @@ const MessagesPage = () => {
                     onReload={reloadChannels}
                   />
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* AI Chatbot - Floating Button (Like WhatsApp Meta AI) - NEW */}
+      {/* AI Chatbot - Floating Button (WhatsApp style) - NEW */}
       <AIChatbot
         targetLanguage={authUser?.learningLanguages?.[0] || 'English'}
         userLevel={authUser?.languageLevel || 'beginner'}
@@ -394,14 +380,12 @@ const ConversationCard = ({
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
-  // Generate fallback avatar
   const getAvatarUrl = () => {
     if (friend?.image) return friend.image;
     const name = encodeURIComponent(friend?.name || 'User');
     return `https://ui-avatars.com/api/?name=${name}&background=random&size=128`;
   };
 
-  // Format timestamp
   const getTimeAgo = () => {
     if (!lastMessage?.created_at) return '';
     try {
@@ -411,14 +395,12 @@ const ConversationCard = ({
     }
   };
 
-  // Truncate message
   const truncateMessage = (text, maxLength = 60) => {
     if (!text) return 'No messages yet';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
   };
 
-  // Handle mark as read
   const handleMarkRead = async (e) => {
     e.stopPropagation();
     try {
@@ -430,7 +412,6 @@ const ConversationCard = ({
     }
   };
 
-  // Handle delete
   const handleDelete = async (e) => {
     e.stopPropagation();
     if (!confirm('Delete this conversation?')) return;
@@ -453,7 +434,6 @@ const ConversationCard = ({
     >
       <div className="card-body p-4">
         <div className="flex items-start gap-3">
-          {/* Checkbox (appears on hover or when selected) */}
           <div className="flex-shrink-0">
             <input
               type="checkbox"
@@ -467,7 +447,6 @@ const ConversationCard = ({
             />
           </div>
 
-          {/* Avatar */}
           <div className="avatar online flex-shrink-0">
             <div className="w-14 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
               <img 
@@ -480,7 +459,6 @@ const ConversationCard = ({
             </div>
           </div>
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className={`font-semibold truncate ${unreadCount > 0 ? 'text-primary' : ''}`}>
@@ -491,13 +469,11 @@ const ConversationCard = ({
               </span>
             </div>
 
-            {/* Last Message */}
             <p className={`text-sm truncate ${unreadCount > 0 ? 'font-semibold' : 'text-base-content/70'}`}>
               {lastMessage?.user?.id === channel.data?.created_by?.id ? 'You: ' : ''}
               {truncateMessage(lastMessage?.text)}
             </p>
 
-            {/* Meta Info */}
             <div className="flex items-center gap-2 mt-2">
               {unreadCount > 0 && (
                 <span className="badge badge-primary badge-sm">
@@ -507,7 +483,6 @@ const ConversationCard = ({
             </div>
           </div>
 
-          {/* Actions Menu */}
           <div className="dropdown dropdown-end flex-shrink-0">
             <button
               tabIndex={0}
