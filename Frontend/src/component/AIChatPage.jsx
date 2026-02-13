@@ -139,15 +139,15 @@ What would you like to talk about?`,
     <div className="fixed inset-0 flex flex-col bg-base-100">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary/10 via-secondary/5 to-primary/10 border-b border-primary/20 px-4 py-3 shadow-sm flex-shrink-0">
-        <div className="container mx-auto flex items-center justify-between gap-4">
+        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link to="/messages" className="btn btn-ghost btn-sm btn-circle">
               <ArrowLeft className="size-5" />
             </Link>
 
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center ring-2 ring-primary/30">
-                <Bot size={24} className="text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center ring-2 ring-primary/30">
+                <Bot size={20} className="sm:size-6 text-white" />
               </div>
               <div>
                 <h3 className="text-sm font-bold flex items-center gap-2">
@@ -175,8 +175,8 @@ What would you like to talk about?`,
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="container mx-auto max-w-4xl">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="w-full max-w-4xl mx-auto">
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div
@@ -184,7 +184,7 @@ What would you like to talk about?`,
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-content'
                       : 'bg-base-200 text-base-content'
@@ -196,7 +196,7 @@ What would you like to talk about?`,
                       <span className="text-xs font-semibold text-primary">AI Assistant</span>
                     </div>
                   )}
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
                     {message.content}
                   </p>
                   <p className={`text-xs mt-2 ${
@@ -228,8 +228,8 @@ What would you like to talk about?`,
 
       {/* Quick Suggestions */}
       {messages.length === 1 && (
-        <div className="px-4 pb-2">
-          <div className="container mx-auto max-w-4xl">
+        <div className="px-4 pb-2 flex-shrink-0">
+          <div className="w-full max-w-4xl mx-auto">
             <div className="flex items-center gap-2 mb-2">
               <Lightbulb size={16} className="text-primary" />
               <p className="text-xs font-semibold text-base-content/70">Try asking:</p>
@@ -254,9 +254,9 @@ What would you like to talk about?`,
         </div>
       )}
 
-      {/* Input */}
+      {/* Input Area */}
       <div className="border-t border-base-300 p-4 flex-shrink-0">
-        <div className="container mx-auto max-w-4xl">
+        <div className="w-full max-w-4xl mx-auto">
           <div className="flex gap-2">
             <textarea
               value={inputText}
