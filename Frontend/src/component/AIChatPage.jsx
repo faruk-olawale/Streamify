@@ -12,6 +12,7 @@ const AIChatPage = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const targetLanguage = authUser?.learningLanguages?.[0] || 'English';
   const userLevel = authUser?.languageLevel || 'beginner';
@@ -71,6 +72,11 @@ What would you like to talk about?`,
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
+
+    // Blur textarea to hide mobile keyboard
+    if (textareaRef.current) {
+      textareaRef.current.blur();
+    }
 
     try {
       // Send to AI
@@ -136,70 +142,68 @@ What would you like to talk about?`,
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-base-100">
+    <div className="fixed inset-0 flex flex-col bg-base-100 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary/10 via-secondary/5 to-primary/10 border-b border-primary/20 px-4 py-3 shadow-sm flex-shrink-0">
-        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link to="/messages" className="btn btn-ghost btn-sm btn-circle">
+      <div className="bg-gradient-to-r from-primary/10 via-secondary/5 to-primary/10 border-b border-primary/20 px-3 sm:px-4 py-3 shadow-sm flex-shrink-0">
+        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <Link to="/messages" className="btn btn-ghost btn-sm btn-circle flex-shrink-0">
               <ArrowLeft className="size-5" />
             </Link>
 
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center ring-2 ring-primary/30">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center ring-2 ring-primary/30 flex-shrink-0">
                 <Bot size={20} className="sm:size-6 text-white" />
               </div>
-              <div>
-                <h3 className="text-sm font-bold flex items-center gap-2">
-                  AI Practice Partner
-                  <Sparkles size={14} className="text-primary animate-pulse" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold flex items-center gap-1 sm:gap-2">
+                  <span className="truncate">AI Practice Partner</span>
+                  <Sparkles size={12} className="sm:size-3.5 text-primary animate-pulse flex-shrink-0" />
                 </h3>
-                <p className="text-xs opacity-60">
-                  Learning {targetLanguage} • {userLevel}
+                <p className="text-xs opacity-60 truncate">
+                  {targetLanguage} • {userLevel}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={clearChat}
-              className="btn btn-ghost btn-sm gap-2"
-              title="Clear chat"
-            >
-              <Trash2 size={16} />
-              <span className="hidden sm:inline">Clear</span>
-            </button>
-          </div>
+          <button
+            onClick={clearChat}
+            className="btn btn-ghost btn-sm gap-1 sm:gap-2 flex-shrink-0"
+            title="Clear chat"
+          >
+            <Trash2 size={14} className="sm:size-4" />
+            <span className="hidden sm:inline text-xs">Clear</span>
+          </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4">
         <div className="w-full max-w-4xl mx-auto">
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 ${
+                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2 sm:py-3 ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-content'
                       : 'bg-base-200 text-base-content'
                   }`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <Bot size={16} className="text-primary" />
+                    <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                      <Bot size={14} className="sm:size-4 text-primary" />
                       <span className="text-xs font-semibold text-primary">AI Assistant</span>
                     </div>
                   )}
                   <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
                     {message.content}
                   </p>
-                  <p className={`text-xs mt-2 ${
+                  <p className={`text-xs mt-1 sm:mt-2 ${
                     message.role === 'user' 
                       ? 'text-primary-content/60' 
                       : 'text-base-content/50'
@@ -212,7 +216,7 @@ What would you like to talk about?`,
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-base-200 rounded-2xl px-4 py-3">
+                <div className="bg-base-200 rounded-2xl px-3 sm:px-4 py-2 sm:py-3">
                   <div className="flex items-center gap-2">
                     <span className="loading loading-dots loading-sm"></span>
                     <span className="text-xs text-base-content/60">AI is typing...</span>
@@ -228,23 +232,23 @@ What would you like to talk about?`,
 
       {/* Quick Suggestions */}
       {messages.length === 1 && (
-        <div className="px-4 pb-2 flex-shrink-0">
+        <div className="px-3 sm:px-4 pb-2 flex-shrink-0">
           <div className="w-full max-w-4xl mx-auto">
             <div className="flex items-center gap-2 mb-2">
-              <Lightbulb size={16} className="text-primary" />
+              <Lightbulb size={14} className="text-primary flex-shrink-0" />
               <p className="text-xs font-semibold text-base-content/70">Try asking:</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
                 "How do I introduce myself?",
-                "Can you help me with grammar?",
-                "Let's practice ordering food",
-                "Teach me common phrases"
+                "Help with grammar",
+                "Practice ordering food",
+                "Common phrases"
               ].map((suggestion, index) => (
                 <button
                   key={index}
                   onClick={() => setInputText(suggestion)}
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-xs sm:btn-sm btn-outline text-xs"
                 >
                   {suggestion}
                 </button>
@@ -254,28 +258,40 @@ What would you like to talk about?`,
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="border-t border-base-300 p-4 flex-shrink-0">
+      {/* Input Area - FIXED FOR MOBILE */}
+      <div className="border-t border-base-300 p-3 sm:p-4 flex-shrink-0 bg-base-100">
         <div className="w-full max-w-4xl mx-auto">
-          <div className="flex gap-2">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="textarea textarea-bordered flex-1 resize-none min-h-[60px] max-h-[120px]"
-              disabled={isLoading}
-              rows={2}
-            />
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 min-w-0">
+              <textarea
+                ref={textareaRef}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="textarea textarea-bordered w-full resize-none text-base"
+                style={{ 
+                  fontSize: '16px', // Prevents zoom on iOS
+                  minHeight: '44px', // Touch-friendly height
+                  maxHeight: '120px'
+                }}
+                disabled={isLoading}
+                rows={1}
+              />
+            </div>
             <button
               onClick={handleSend}
               disabled={!inputText.trim() || isLoading}
-              className="btn btn-primary btn-square self-end"
+              className="btn btn-primary btn-square flex-shrink-0"
+              style={{ 
+                minWidth: '44px', 
+                minHeight: '44px' 
+              }}
             >
               <Send size={20} />
             </button>
           </div>
-          <p className="text-xs text-center text-base-content/40 mt-2">
+          <p className="text-xs text-center text-base-content/40 mt-2 hidden sm:block">
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>
